@@ -360,3 +360,91 @@ describe("a paused store stops taking orders", () => {
     expect((await addToCartAction(storeSlug, cheapProductId, null, 1)).ok).toBe(true);
   });
 });
+
+describe("discount limits hold under pressure", () => {
+  it("never lets concurrent orders exceed a total usage limit", async () => {
+    const discount = await createDiscount(ctx, {
+      code: "RACELIMIT",
+      title: "Race limit",
+      type: "PERCENTAGE",
+      value: 10,
+      status: "ACTIVE",
+      usageLimit: 3,
+      startsAt: new Date(Date.now() - 60_000),
+    });
+
+    const line = { productId: cheapProductId, variantId: null, quantity: 1 };
+    const attempts = await Promise.allSettled(
+      Array.from({ length: 8 }, (_, i) =>
+        createOrder(ctx, {
+          email: `racer-${i}@example.test`,
+          lines: [line],
+          discountCode: "RACELIMIT",
+          discountAmount: 2,
+        }),
+      ),
+    );
+
+    const succeeded = attempts.filter((a) => a.status === "fulfilled").length;
+    expect(succeeded).toBe(3);
+
+    const after = await testDb.discount.findUniqueOrThrow({ where: { id: discount.id } });
+    expect(after.usageCount).toBe(3);
+  });
+
+  it("enforces one use per customer across separate orders", async () => {
+    await createDiscount(ctx, {
+      code: "ONCEONLY",
+      title: "Once only",
+      type: "PERCENTAGE",
+      value: 10,
+      status: "ACTIVE",
+      oncePerCustomer: true,
+      startsAt: new Date(Date.now() - 60_000),
+    });
+
+    const line = { productId: cheapProductId, variantId: null, quantity: 1 };
+    const first = await createOrder(ctx, {
+      email: "repeat@example.test",
+      lines: [line],
+      discountCode: "ONCEONLY",
+      discountAmount: 2,
+    });
+    expect(first.id).toBeTruthy();
+
+    await expect(
+      createOrder(ctx, {
+        email: "repeat@example.test",
+        lines: [line],
+        discountCode: "ONCEONLY",
+        discountAmount: 2,
+      }),
+    ).rejects.toThrow(/already been used/i);
+
+    // A different shopper is unaffected.
+    const other = await createOrder(ctx, {
+      email: "someone-else@example.test",
+      lines: [line],
+      discountCode: "ONCEONLY",
+      discountAmount: 2,
+    });
+    expect(other.id).toBeTruthy();
+  });
+});
+
+describe("concurrent checkouts", () => {
+  it("gives every simultaneous order its own number", async () => {
+    const line = { productId: cheapProductId, variantId: null, quantity: 1 };
+    const results = await Promise.all(
+      Array.from({ length: 10 }, (_, i) =>
+        createOrder(ctx, { email: `concurrent-${i}@example.test`, lines: [line] }),
+      ),
+    );
+
+    const numbers = results.map((order) => order.number);
+    expect(new Set(numbers).size).toBe(10);
+    // Contiguous, so the sequence has no gaps a merchant would have to explain.
+    const sorted = [...numbers].sort((a, b) => a - b);
+    expect(sorted[sorted.length - 1] - sorted[0]).toBe(9);
+  });
+});

@@ -325,6 +325,20 @@ export function DiscountForm({
               <Input id="usageLimit" type="number" min="1" value={values.usageLimit} disabled={!canWrite}
                 onChange={(e) => set("usageLimit", e.target.value)} />
             </Field>
+            <div className="flex items-center justify-between rounded-md border border-ink-200 px-3 py-2 sm:col-span-3">
+              <div>
+                <Label className="mb-0" htmlFor="oncePerCustomer">One use per customer</Label>
+                <p className="text-[12px] text-ink-500">
+                  Checked against the customer record and the email at checkout.
+                </p>
+              </div>
+              <Switch
+                id="oncePerCustomer"
+                checked={values.oncePerCustomer}
+                disabled={!canWrite}
+                onCheckedChange={(checked) => set("oncePerCustomer", checked)}
+              />
+            </div>
           </CardContent>
         </Card>
 

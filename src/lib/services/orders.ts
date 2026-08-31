@@ -76,7 +76,20 @@ export async function getOrder(ctx: ServiceContext, id: string) {
   return order;
 }
 
+/** Namespace for this module's advisory locks, so they cannot collide with another's. */
+const ORDER_NUMBER_LOCK = 8_147_231;
+
+/**
+ * Allocates the next order number for a store.
+ *
+ * `MAX(number) + 1` on its own is a race: two checkouts in the same moment both
+ * read the same maximum, both insert it, and one loses to the unique index on
+ * (storeId, number) — a shopper who did nothing wrong sees checkout fail. The
+ * advisory lock serialises just this allocation, per store, and is released
+ * when the surrounding transaction commits.
+ */
 async function nextOrderNumber(tx: Prisma.TransactionClient, storeId: string) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${ORDER_NUMBER_LOCK}, hashtext(${storeId}))`;
   const last = await tx.order.aggregate({ where: { storeId }, _max: { number: true } });
   return (last._max.number ?? 1000) + 1;
 }
@@ -111,6 +124,33 @@ export type CreateOrderInput = {
  */
 export async function createOrder(ctx: ServiceContext, input: CreateOrderInput) {
   if (!input.lines.length) throw new ValidationError("An order needs at least one line item.");
+
+  // A code marked one-per-customer is checked against this shopper's history
+  // before anything is written. Matching on the customer record and the email
+  // separately covers a guest who orders without one.
+  if (input.discountCode) {
+    const discount = await prisma.discount.findFirst({
+      where: { storeId: ctx.storeId, code: input.discountCode },
+      select: { oncePerCustomer: true },
+    });
+    if (discount?.oncePerCustomer) {
+      const identities: Prisma.OrderWhereInput[] = [{ email: input.email }];
+      if (input.customerId) identities.push({ customerId: input.customerId });
+
+      const prior = await prisma.order.findFirst({
+        where: {
+          storeId: ctx.storeId,
+          discountCode: input.discountCode,
+          paymentStatus: { not: "REFUNDED" },
+          OR: identities,
+        },
+        select: { id: true },
+      });
+      if (prior) {
+        throw new ValidationError("That discount code has already been used on this account.");
+      }
+    }
+  }
 
   const productIds = input.lines.map((line) => line.productId);
   const products = await prisma.product.findMany({
@@ -200,10 +240,25 @@ export async function createOrder(ctx: ServiceContext, input: CreateOrderInput) 
     })));
 
     if (input.discountCode) {
-      await tx.discount.updateMany({
-        where: { storeId: ctx.storeId, code: input.discountCode },
+      // Claim a use rather than incrementing blindly. The limit was checked
+      // when the code was applied to the cart, but between then and here other
+      // checkouts can redeem it, so a code capped at N could otherwise be used
+      // more than N times by concurrent orders. Matching on the count means the
+      // database decides, and the order fails if the code just ran out.
+      const claimed = await tx.discount.updateMany({
+        where: {
+          storeId: ctx.storeId,
+          code: input.discountCode,
+          OR: [
+            { usageLimit: null },
+            { usageCount: { lt: prisma.discount.fields.usageLimit } },
+          ],
+        },
         data: { usageCount: { increment: 1 } },
       });
+      if (claimed.count === 0) {
+        throw new ValidationError("That discount code has reached its usage limit.");
+      }
     }
 
     // Keep the daily rollup's money columns aligned with the order table.
