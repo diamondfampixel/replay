@@ -3,7 +3,7 @@ import { prisma, type Prisma, type ProductStatus } from "@/lib/db";
 import { slugify } from "@/lib/utils";
 import { toNumber } from "@/lib/money";
 import {
-  audit, authorize, NotFoundError, uniqueStoreSlug, type ServiceContext,
+  audit, authorize, NotFoundError, uniqueStoreSlug, ValidationError, type ServiceContext,
 } from "@/lib/services/context";
 import {
   productInputSchema, productListParamsSchema,
@@ -432,30 +432,52 @@ export async function getCatalogFacets(storeId: string) {
   };
 }
 
-/** Decrements stock for a purchased line. Never goes below zero. */
+/**
+ * Claims stock for a purchased line, refusing the sale when there is not enough.
+ *
+ * Reading the level and then writing `max(0, level - quantity)` both oversells
+ * and hides it: concurrent orders each read the same level, each write a
+ * non-negative result, and every one of them succeeds. The conditional update
+ * makes the database the arbiter, so exactly as many orders succeed as there
+ * were units.
+ *
+ * The variant is the authoritative counter when a line has one; `Product.inventory`
+ * is a rollup of its variants, so it is decremented best-effort rather than
+ * enforced — drift between the two should not block a sale the variant allows.
+ */
 export async function decrementInventory(
   tx: Prisma.TransactionClient,
   items: Array<{ productId: string; variantId: string | null; quantity: number }>,
 ) {
   for (const item of items) {
-    if (item.variantId) {
-      const variant = await tx.productVariant.findUnique({ where: { id: item.variantId } });
-      if (variant) {
-        await tx.productVariant.update({
-          where: { id: item.variantId },
-          data: { inventory: Math.max(0, variant.inventory - item.quantity) },
-        });
-      }
-    }
     const product = await tx.product.findUnique({
       where: { id: item.productId },
-      select: { inventory: true, trackInventory: true },
+      select: { title: true, trackInventory: true },
     });
-    if (product?.trackInventory) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { inventory: Math.max(0, product.inventory - item.quantity) },
+    if (!product?.trackInventory) continue;
+
+    const soldOut = () =>
+      new ValidationError(`${product.title} does not have enough stock left.`);
+
+    if (item.variantId) {
+      const claimed = await tx.productVariant.updateMany({
+        where: { id: item.variantId, inventory: { gte: item.quantity } },
+        data: { inventory: { decrement: item.quantity } },
       });
+      if (claimed.count === 0) throw soldOut();
+
+      // Keep the product-level rollup aligned, clamped so it cannot go negative.
+      await tx.product.updateMany({
+        where: { id: item.productId, inventory: { gte: item.quantity } },
+        data: { inventory: { decrement: item.quantity } },
+      });
+      continue;
     }
+
+    const claimed = await tx.product.updateMany({
+      where: { id: item.productId, inventory: { gte: item.quantity } },
+      data: { inventory: { decrement: item.quantity } },
+    });
+    if (claimed.count === 0) throw soldOut();
   }
 }

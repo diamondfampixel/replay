@@ -410,7 +410,7 @@ assistant and its 40 tools, the visual store editor with draft/publish, campaign
 authoring, review moderation, content pages, media upload, the integration
 framework, settings, audit logging and demo-data purge.
 
-**Verified how:** 180 automated tests against a real database, plus a browser
+**Verified how:** 181 automated tests against a real database, plus a browser
 smoke test that completes a purchase end to end. The assistant's tool-calling
 loop is covered with the Anthropic SDK mocked — the orchestration, risk gating,
 confirmation flow and transcript persistence are all exercised, but the build

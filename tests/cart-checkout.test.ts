@@ -448,3 +448,30 @@ describe("concurrent checkouts", () => {
     expect(sorted[sorted.length - 1] - sorted[0]).toBe(9);
   });
 });
+
+describe("inventory under concurrent orders", () => {
+  it("does not sell more units than exist", async () => {
+    const scarce = await createProduct(ctx, {
+      title: "Last Few",
+      status: "ACTIVE",
+      price: 30,
+      trackInventory: true,
+      inventory: 5,
+    });
+
+    const line = { productId: scarce.id, variantId: null, quantity: 1 };
+    const attempts = await Promise.allSettled(
+      Array.from({ length: 12 }, (_, i) =>
+        createOrder(ctx, { email: `oversell-${i}@example.test`, lines: [line] }),
+      ),
+    );
+
+    const sold = attempts.filter((a) => a.status === "fulfilled").length;
+    const after = await testDb.product.findUniqueOrThrow({ where: { id: scarce.id } });
+
+    // Whatever the split, units sold plus units left must equal what we started
+    // with, and stock must never go negative.
+    expect(after.inventory).toBeGreaterThanOrEqual(0);
+    expect(sold + after.inventory).toBe(5);
+  });
+});
