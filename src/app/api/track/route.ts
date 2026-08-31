@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { EVENT_TYPES, classifyDevice, trackEvent } from "@/lib/services/events";
-import { recordExperimentEvent } from "@/lib/services/experiments";
+import { filterValidAssignments, recordExperimentEvent } from "@/lib/services/experiments";
 import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -61,7 +61,10 @@ export async function POST(request: Request) {
       value: body.value ?? null,
     });
 
-    for (const assignment of body.experiments ?? []) {
+    // The ids arrive from the browser, so they are checked against this store
+    // before anything is written.
+    const assignments = await filterValidAssignments(store.id, body.experiments ?? []);
+    for (const assignment of assignments) {
       await recordExperimentEvent({
         experimentId: assignment.experimentId,
         variantId: assignment.variantId,

@@ -3,6 +3,7 @@ import { cleanupTestStore, createTestStore, testDb } from "./helpers";
 import {
   assignVariant, chooseWinner, createExperiment, getExperimentResults,
   recordConversions, recordExperimentEvent, setExperimentStatus, getAssignmentsFor,
+  filterValidAssignments,
 } from "@/lib/services/experiments";
 import { ensureHomepage } from "@/lib/services/provision";
 import type { ServiceContext } from "@/lib/services/context";
@@ -273,5 +274,75 @@ describe("choosing a winner", () => {
     const updated = await testDb.experiment.findUniqueOrThrow({ where: { id: experiment.id } });
     expect(updated.status).toBe("COMPLETED");
     expect(updated.winnerVariantId).toBe(challenger.id);
+  });
+});
+
+describe("assignments supplied by an untrusted client", () => {
+  it("only accepts variants that belong to a running experiment in the same store", async () => {
+    const experiment = await createExperiment(ctx, {
+      name: "Tenant scoping", testType: "headline", targetType: "page", pageId, sectionId, goal: "purchase",
+      variants: [
+        { name: "A", isControl: true, weight: 50, changes: { headline: "A" } },
+        { name: "B", weight: 50, changes: { headline: "B" } },
+      ],
+    });
+    await setExperimentStatus(ctx, experiment.id, "RUNNING");
+    const [control, challenger] = experiment.variants;
+
+    // A second tenant, to stand in for the attacker's own store.
+    const other = await createTestStore("experiments-other");
+    const otherPage = await ensureHomepage(testDb, other.ctx.storeId);
+    const otherSection = await testDb.pageSection.findFirstOrThrow({
+      where: { pageId: otherPage.id, type: "hero" },
+    });
+    const foreign = await createExperiment(other.ctx, {
+      name: "Someone else's test", testType: "headline", targetType: "page",
+      pageId: otherPage.id, sectionId: otherSection.id, goal: "purchase",
+      variants: [
+        { name: "A", isControl: true, weight: 50, changes: { headline: "A" } },
+        { name: "B", weight: 50, changes: { headline: "B" } },
+      ],
+    });
+    await setExperimentStatus(other.ctx, foreign.id, "RUNNING");
+
+    const valid = { experimentId: experiment.id, variantId: challenger.id };
+
+    // Genuine assignment survives.
+    expect(await filterValidAssignments(ctx.storeId, [valid])).toEqual([valid]);
+
+    // Another store's experiment is rejected.
+    expect(
+      await filterValidAssignments(ctx.storeId, [
+        { experimentId: foreign.id, variantId: foreign.variants[0].id },
+      ]),
+    ).toEqual([]);
+
+    // A variant paired with an experiment it does not belong to is rejected.
+    expect(
+      await filterValidAssignments(ctx.storeId, [
+        { experimentId: experiment.id, variantId: foreign.variants[0].id },
+      ]),
+    ).toEqual([]);
+
+    // Invented ids are rejected.
+    expect(
+      await filterValidAssignments(ctx.storeId, [
+        { experimentId: experiment.id, variantId: "does-not-exist" },
+      ]),
+    ).toEqual([]);
+
+    // A paused experiment stops accepting impressions.
+    await setExperimentStatus(ctx, experiment.id, "PAUSED");
+    expect(await filterValidAssignments(ctx.storeId, [valid])).toEqual([]);
+    await setExperimentStatus(ctx, experiment.id, "RUNNING");
+
+    // The control variant of the same running experiment is still fine.
+    expect(
+      await filterValidAssignments(ctx.storeId, [
+        { experimentId: experiment.id, variantId: control.id },
+      ]),
+    ).toHaveLength(1);
+
+    await cleanupTestStore(other.organization.id, other.user.id);
   });
 });

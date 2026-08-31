@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import type Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/db";
-import { serviceContext } from "@/lib/services/context";
+import { apiContext } from "@/lib/services/context";
 import { getAIConfig } from "@/lib/ai/config";
 import { createAnthropic, extractJson } from "@/lib/ai/client";
 import { buildStoreContext } from "@/lib/ai/context";
@@ -23,7 +23,7 @@ const bodySchema = z.object({
 
 /** Generates alternative copy for an A/B test. Writes nothing. */
 export async function POST(request: Request) {
-  const ctx = await serviceContext().catch(() => null);
+  const ctx = await apiContext();
   if (!ctx) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   if (!can(ctx.role, "experiments:write")) {
     return NextResponse.json({ error: "Your role cannot create experiments." }, { status: 403 });
@@ -88,8 +88,9 @@ export async function POST(request: Request) {
     const variants = z.array(z.string().min(1).max(2000)).parse(extractJson(text));
     return NextResponse.json({ variants: variants.slice(0, input.count) });
   } catch (error) {
+    // Upstream errors can quote the request or the key's account; log them
+    // server-side and hand the client a fixed string.
     console.error("[api/ai/generate-variants]", error);
-    const message = error instanceof Error ? error.message : "Generation failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Generation failed" }, { status: 500 });
   }
 }

@@ -43,3 +43,30 @@ export function extractJson<T>(text: string): T {
   }
   throw new Error("The model returned malformed JSON.");
 }
+
+/**
+ * Turns a provider failure into something an operator can act on without
+ * echoing the upstream body back to the browser. The raw error is worth
+ * logging, but it can quote the request that triggered it, so only the shape
+ * of the failure — not its text — reaches the client.
+ */
+export function providerErrorMessage(error: unknown): string | null {
+  if (error instanceof AINotConfiguredError) return error.message;
+  if (!(error instanceof Anthropic.APIError)) return null;
+
+  switch (error.status) {
+    case 401:
+    case 403:
+      return "The configured Anthropic API key was rejected. Check it under Integrations.";
+    case 404:
+      return "The configured model is unavailable for this API key.";
+    case 429:
+      return "The Anthropic API rate limit was reached. Try again shortly.";
+    case 400:
+      return "The assistant sent a request the API rejected. The details are in the server log.";
+    default:
+      return error.status && error.status >= 500
+        ? "The Anthropic API is unavailable right now. Try again shortly."
+        : null;
+  }
+}

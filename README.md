@@ -356,6 +356,13 @@ Drives a real purchase through a real browser: product page, variant selection,
 cart drawer, discount entry and checkout. Requires Playwright
 (`npm i -D playwright && npx playwright install chromium`).
 
+If Chromium is already on the machine — a CI image, a devcontainer — point the
+script at it instead of downloading a second copy:
+
+```bash
+PLAYWRIGHT_CHROMIUM_PATH=/path/to/chromium npm run smoke
+```
+
 ---
 
 ## Deployment
@@ -393,7 +400,7 @@ assistant and its 40 tools, the visual store editor with draft/publish, campaign
 authoring, review moderation, content pages, media upload, the integration
 framework, settings, audit logging and demo-data purge.
 
-**Verified how:** 113 automated tests against a real database, plus a browser
+**Verified how:** 115 automated tests against a real database, plus a browser
 smoke test that completes a purchase end to end. The assistant's tool-calling
 loop is covered with the Anthropic SDK mocked — the orchestration, risk gating,
 confirmation flow and transcript persistence are all exercised, but the build

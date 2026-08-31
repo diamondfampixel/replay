@@ -1,8 +1,8 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import type { Role } from "@/generated/prisma/client";
-import { assertCan, type Capability } from "@/lib/permissions";
-import { requireContext } from "@/lib/session";
+import { AuthorizationError, assertCan, type Capability } from "@/lib/permissions";
+import { getActiveContext, requireContext } from "@/lib/session";
 
 /**
  * Everything a service call needs: which tenant, who is asking, and whether the
@@ -23,6 +23,28 @@ export async function serviceContext(
   overrides: Partial<Pick<ServiceContext, "actor" | "prompt">> = {},
 ): Promise<ServiceContext> {
   const ctx = await requireContext();
+  return {
+    storeId: ctx.storeId,
+    organizationId: ctx.organizationId,
+    userId: ctx.user.id,
+    role: ctx.role,
+    actor: overrides.actor ?? "user",
+    prompt: overrides.prompt,
+  };
+}
+
+/**
+ * The API-route counterpart to `serviceContext`. Pages want `requireContext`,
+ * which redirects an anonymous visitor to the login screen; a route handler
+ * must not, because `redirect()` throws a NEXT_REDIRECT control-flow signal
+ * that a surrounding try/catch would swallow into a misleading 500. This
+ * returns null instead so the caller can answer with a plain 401.
+ */
+export async function apiContext(
+  overrides: Partial<Pick<ServiceContext, "actor" | "prompt">> = {},
+): Promise<ServiceContext | null> {
+  const ctx = await getActiveContext();
+  if (!ctx) return null;
   return {
     storeId: ctx.storeId,
     organizationId: ctx.organizationId,
@@ -102,4 +124,21 @@ export async function uniqueStoreSlug(
     n += 1;
     candidate = `${root}-${n}`;
   }
+}
+
+/**
+ * The message for an error we raised ourselves is written for the operator and
+ * is safe to show. Anything else — a driver fault, an upstream HTTP error — can
+ * quote connection strings, file paths or request bodies, so it is replaced
+ * with a fixed string and the detail is left in the server log.
+ */
+export function clientErrorMessage(error: unknown, fallback: string): string {
+  if (
+    error instanceof ValidationError ||
+    error instanceof NotFoundError ||
+    error instanceof AuthorizationError
+  ) {
+    return error.message;
+  }
+  return fallback;
 }

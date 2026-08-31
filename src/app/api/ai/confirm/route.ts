@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { serviceContext } from "@/lib/services/context";
+import { apiContext, clientErrorMessage } from "@/lib/services/context";
 import { cancelPendingAction, confirmPendingAction, undoAction } from "@/lib/ai/executor";
 
 export const runtime = "nodejs";
@@ -11,7 +11,7 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const ctx = await serviceContext({ actor: "ai" }).catch(() => null);
+  const ctx = await apiContext({ actor: "ai" });
   if (!ctx) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
@@ -43,7 +43,8 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not complete that.";
+    console.error("[api/ai/confirm]", error);
+    const message = clientErrorMessage(error, "Could not complete that.");
     return NextResponse.json({ status: "failed", error: message }, { status: 400 });
   }
 }

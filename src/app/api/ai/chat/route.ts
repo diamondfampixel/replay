@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import type Anthropic from "@anthropic-ai/sdk";
 import { getAIConfig } from "@/lib/ai/config";
-import { createAnthropic } from "@/lib/ai/client";
+import { createAnthropic, providerErrorMessage } from "@/lib/ai/client";
 import { SYSTEM_PROMPT, buildStoreContext } from "@/lib/ai/context";
 import { toAnthropicTools, toolsForRole, getTool } from "@/lib/ai/registry";
 import { executeTool } from "@/lib/ai/executor";
@@ -10,7 +10,7 @@ import {
   appendMessage, ensureTitle, getOrCreateConversation, loadMessages, touchConversation,
   type PendingAction, type StoredToolCall,
 } from "@/lib/ai/conversation";
-import { serviceContext } from "@/lib/services/context";
+import { apiContext, clientErrorMessage } from "@/lib/services/context";
 import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -24,7 +24,7 @@ const bodySchema = z.object({
 const MAX_TOOL_ROUNDS = 8;
 
 export async function POST(request: Request) {
-  const ctx = await serviceContext({ actor: "ai" }).catch(() => null);
+  const ctx = await apiContext({ actor: "ai" });
   if (!ctx) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
   const limit = rateLimit(`ai:${ctx.userId}`, { limit: 40, windowMs: 5 * 60_000 });
@@ -237,7 +237,8 @@ export async function POST(request: Request) {
       } catch (error) {
         console.error("[api/ai/chat]", error);
         const message =
-          error instanceof Error ? error.message : "The assistant could not complete that request.";
+          providerErrorMessage(error) ??
+          clientErrorMessage(error, "The assistant could not complete that request.");
         send("error", { error: message });
         await appendMessage(
           conversation.id,

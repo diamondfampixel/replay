@@ -72,6 +72,34 @@ export async function getAssignmentsFor(
 }
 
 /** Impressions and conversions are unique per session, enforced by the schema. */
+/**
+ * Filters client-supplied experiment assignments down to the ones that are
+ * actually real for this store.
+ *
+ * The public tracking endpoint takes experiment and variant ids from the
+ * request body, so without this a caller could post impressions into another
+ * organization's test, into a test that is not running, or pair a variant with
+ * an experiment it does not belong to — all of which would quietly corrupt the
+ * results another operator makes decisions from.
+ */
+export async function filterValidAssignments(
+  storeId: string,
+  assignments: { experimentId: string; variantId: string }[],
+): Promise<{ experimentId: string; variantId: string }[]> {
+  if (!assignments.length) return [];
+
+  const variants = await prisma.experimentVariant.findMany({
+    where: {
+      id: { in: assignments.map((a) => a.variantId) },
+      experiment: { storeId, status: "RUNNING" },
+    },
+    select: { id: true, experimentId: true },
+  });
+
+  const allowed = new Map(variants.map((v) => [v.id, v.experimentId]));
+  return assignments.filter((a) => allowed.get(a.variantId) === a.experimentId);
+}
+
 export async function recordExperimentEvent(input: {
   experimentId: string;
   variantId: string;

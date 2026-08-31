@@ -38,6 +38,7 @@ vi.mock("@/lib/services/context", async () => {
   return {
     ...actual,
     serviceContext: async () => ctx,
+    apiContext: async () => ctx,
   };
 });
 
@@ -182,12 +183,41 @@ describe("chat loop", () => {
 
   it("surfaces a provider failure without losing the conversation", async () => {
     createSpy.mockImplementationOnce(async () => {
-      throw new Error("upstream is unavailable");
+      throw new Error("upstream is unavailable: key sk-ant-secret rejected");
     });
 
     const events = await readStream(await post("Anything happening?"));
     const error = events.find((event) => event.event === "error");
-    expect(error?.data.error).toMatch(/upstream is unavailable/i);
+
+    // The operator is told the request failed, but the upstream text is not
+    // relayed — it can quote the request body or the key that produced it.
+    expect(error).toBeDefined();
+    expect(error?.data.error).toMatch(/could not complete that request/i);
+    expect(JSON.stringify(error?.data)).not.toMatch(/sk-ant-secret/);
+
+    // The turn is still recorded rather than silently dropped.
+    const conversation = await testDb.aIConversation.findFirst({
+      where: { storeId: ctx.storeId },
+      orderBy: { updatedAt: "desc" },
+    });
+    expect(conversation).not.toBeNull();
+  });
+
+  it("maps a rejected API key to actionable text without echoing the provider body", async () => {
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
+    createSpy.mockImplementationOnce(async () => {
+      throw new Anthropic.AuthenticationError(
+        401,
+        { error: { message: "invalid x-api-key sk-ant-secret" } },
+        "unauthorized",
+        new Headers(),
+      );
+    });
+
+    const events = await readStream(await post("Anything happening?"));
+    const error = events.find((event) => event.event === "error");
+    expect(error?.data.error).toMatch(/API key was rejected/i);
+    expect(JSON.stringify(error?.data)).not.toMatch(/sk-ant-secret/);
   });
 
   it("stops after the round limit rather than looping forever", async () => {
