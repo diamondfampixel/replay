@@ -144,6 +144,10 @@ export async function inviteMemberAction(email: string, role: Role) {
       );
     }
 
+    if (role === "OWNER" && ctx.role !== "OWNER") {
+      return fail("Only an owner can add another owner.");
+    }
+
     const existing = await prisma.membership.findUnique({
       where: { userId_organizationId: { userId: user.id, organizationId: ctx.organizationId } },
     });
@@ -167,6 +171,19 @@ export async function updateMemberRoleAction(membershipId: string, role: Role) {
       where: { id: membershipId, organizationId: ctx.organizationId },
     });
     if (!membership) return fail("That team member no longer exists.");
+
+    // Owner and admin differ by a single capability, so granting the owner role
+    // is what separates them. Without these three rules an admin could promote
+    // themselves and then remove the real owner.
+    if (membership.userId === ctx.userId) {
+      return fail("You cannot change your own role. Ask another owner to do it.");
+    }
+    if (role === "OWNER" && ctx.role !== "OWNER") {
+      return fail("Only an owner can grant the owner role.");
+    }
+    if (membership.role === "OWNER" && ctx.role !== "OWNER") {
+      return fail("Only an owner can change another owner's role.");
+    }
 
     if (membership.role === "OWNER") {
       const owners = await prisma.membership.count({
@@ -192,6 +209,9 @@ export async function removeMemberAction(membershipId: string) {
     });
     if (!membership) return fail("That team member no longer exists.");
     if (membership.userId === ctx.userId) return fail("You cannot remove yourself.");
+    if (membership.role === "OWNER" && ctx.role !== "OWNER") {
+      return fail("Only an owner can remove another owner.");
+    }
 
     if (membership.role === "OWNER") {
       const owners = await prisma.membership.count({
