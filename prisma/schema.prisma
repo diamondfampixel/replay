@@ -233,8 +233,11 @@ model Page {
   seoTitle       String?
   seoDescription String?
 
-  // publishing: draft sections live on the section rows; publishedAt marks last publish
-  publishedAt DateTime?
+  // Draft/publish split: PageSection rows are what visitors see. While a page
+  // is being edited, the working copy lives here as an ordered section array
+  // and is only written onto the live rows when the operator publishes.
+  draftSections Json?
+  publishedAt   DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
