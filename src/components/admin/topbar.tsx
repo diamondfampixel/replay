@@ -15,6 +15,7 @@ import { ROLE_LABELS } from "@/lib/permissions";
 import type { Role } from "@/generated/prisma/client";
 import { logoutAction } from "@/app/actions/auth";
 import { markNotificationsReadAction } from "@/app/actions/notifications";
+import { useAssistantPanel } from "@/components/admin/assistant-panel";
 
 export type TopbarNotification = {
   id: string;
@@ -42,6 +43,7 @@ export function Topbar({
   onOpenMobileNav: () => void;
 }) {
   const router = useRouter();
+  const assistant = useAssistantPanel();
   const [, startTransition] = useTransition();
   const [items, setItems] = useState(notifications);
   const unread = items.filter((n) => !n.read).length;
@@ -62,11 +64,14 @@ export function Topbar({
         <p className="truncate text-[11.5px] text-ink-500">{storeName}</p>
       </div>
 
-      <Button asChild size="sm" variant="secondary" className="hidden sm:inline-flex">
-        <Link href="/admin/assistant">
-          <Sparkles className="text-pine-600" />
-          Ask AI
-        </Link>
+      <Button
+        size="sm"
+        variant="secondary"
+        onClick={() => assistant.open()}
+        className="hidden sm:inline-flex"
+      >
+        <Sparkles className="text-pine-600" />
+        Ask AI
       </Button>
 
       <DropdownMenu

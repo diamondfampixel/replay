@@ -1,7 +1,17 @@
 import { z } from "zod";
 
 const money = z.coerce.number().min(0).max(1_000_000).multipleOf(0.01, "Use at most two decimal places");
-const optionalMoney = z.union([money, z.literal("").transform(() => null), z.null()]).optional();
+
+/**
+ * Nullable money.
+ *
+ * `z.coerce.number()` turns null into 0, so a nullable coerced field must check
+ * for null *before* coercion — otherwise clearing a compare-at price silently
+ * stores $0.00 and the storefront shows a phantom sale.
+ */
+const optionalMoney = z
+  .union([z.null(), z.literal("").transform(() => null), money])
+  .optional();
 
 export const productStatusSchema = z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]);
 

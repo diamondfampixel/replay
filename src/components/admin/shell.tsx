@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Sidebar } from "@/components/admin/sidebar";
 import { Topbar, type TopbarNotification } from "@/components/admin/topbar";
 import { CommandBarProvider } from "@/components/admin/command-bar";
+import { AssistantPanelProvider } from "@/components/admin/assistant-panel";
 import type { Role } from "@/generated/prisma/client";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +19,7 @@ export function AdminShell({
   storeSlug,
   role,
   notifications,
+  aiConfigured,
   children,
 }: {
   user: { name: string; email: string };
@@ -26,6 +28,7 @@ export function AdminShell({
   storeSlug: string;
   role: Role;
   notifications: TopbarNotification[];
+  aiConfigured: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -56,6 +59,7 @@ export function AdminShell({
 
   return (
     <CommandBarProvider role={role}>
+      <AssistantPanelProvider aiConfigured={aiConfigured}>
       <div className="flex min-h-dvh bg-ink-50">
           <aside
             className={cn(
@@ -98,6 +102,7 @@ export function AdminShell({
             <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 sm:py-6">{children}</main>
           </div>
         </div>
+      </AssistantPanelProvider>
     </CommandBarProvider>
   );
 }

@@ -708,7 +708,7 @@ export async function seedDemoStore(
       endedDaysAgo: 24,
       variants: [
         { name: "A", isControl: true, weight: 50, changes: { text: "10% off your first order" }, lift: 1 },
-        { name: "B", weight: 50, changes: { text: "Free shipping on orders over $75" }, lift: 1.21 },
+        { name: "B", weight: 50, changes: { text: "Free shipping on orders over $75" }, lift: 1.48 },
       ],
     },
     {

@@ -1,17 +1,21 @@
 import { prisma } from "@/lib/db";
 import { requireContext } from "@/lib/session";
 import { AdminShell } from "@/components/admin/shell";
+import { isAIConfigured } from "@/lib/ai/config";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireContext();
 
-  const notifications = await prisma.notification.findMany({
-    where: { storeId: ctx.storeId },
-    orderBy: { createdAt: "desc" },
-    take: 12,
-  });
+  const [notifications, aiConfigured] = await Promise.all([
+    prisma.notification.findMany({
+      where: { storeId: ctx.storeId },
+      orderBy: { createdAt: "desc" },
+      take: 12,
+    }),
+    isAIConfigured(ctx.storeId),
+  ]);
 
   return (
     <AdminShell
@@ -20,6 +24,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       storeName={ctx.storeName}
       storeSlug={ctx.storeSlug}
       role={ctx.role}
+      aiConfigured={aiConfigured}
       notifications={notifications.map((n) => ({
         id: n.id,
         type: n.type,

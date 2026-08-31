@@ -1,0 +1,95 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import type Anthropic from "@anthropic-ai/sdk";
+import { prisma } from "@/lib/db";
+import { serviceContext } from "@/lib/services/context";
+import { getAIConfig } from "@/lib/ai/config";
+import { createAnthropic, extractJson } from "@/lib/ai/client";
+import { buildStoreContext } from "@/lib/ai/context";
+import { can } from "@/lib/permissions";
+import { rateLimit } from "@/lib/rate-limit";
+
+export const runtime = "nodejs";
+
+const bodySchema = z.object({
+  testType: z.string().max(40),
+  field: z.string().max(40),
+  control: z.string().min(1).max(2000),
+  targetType: z.enum(["page", "product"]),
+  pageId: z.string().nullable().optional(),
+  productId: z.string().nullable().optional(),
+  count: z.number().int().min(1).max(5).default(2),
+});
+
+/** Generates alternative copy for an A/B test. Writes nothing. */
+export async function POST(request: Request) {
+  const ctx = await serviceContext().catch(() => null);
+  if (!ctx) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  if (!can(ctx.role, "experiments:write")) {
+    return NextResponse.json({ error: "Your role cannot create experiments." }, { status: 403 });
+  }
+
+  const limit = rateLimit(`variants:${ctx.userId}`, { limit: 20, windowMs: 5 * 60_000 });
+  if (!limit.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
+
+  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+
+  const config = await getAIConfig(ctx.storeId);
+  if (!config) {
+    return NextResponse.json(
+      { error: "No Anthropic API key is configured. Add one under Integrations." },
+      { status: 503 },
+    );
+  }
+
+  const input = parsed.data;
+  const product = input.productId
+    ? await prisma.product.findFirst({
+        where: { id: input.productId, storeId: ctx.storeId },
+        select: { title: true, description: true, price: true, tags: true },
+      })
+    : null;
+
+  const storeContext = await buildStoreContext(ctx.storeId);
+
+  const prompt = [
+    `Write ${input.count} alternative${input.count === 1 ? "" : "s"} to test against this control.`,
+    "",
+    `What is being tested: ${input.testType.replace(/_/g, " ")} (the "${input.field}" field)`,
+    `Control (currently live): ${input.control}`,
+    product ? `Product: ${product.title} — ${product.description ?? "no description"}` : null,
+    "",
+    "Rules:",
+    "- Each alternative must be a genuinely different angle, not a reworded control.",
+    "- Match the length and register of the control.",
+    "- No exclamation marks, no hype, no invented claims about the product.",
+    "- Do not invent facts (materials, guarantees, awards) that are not in the context above.",
+    "",
+    `Return only a JSON array of exactly ${input.count} strings.`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  try {
+    const anthropic = createAnthropic(config);
+    const response = await anthropic.messages.create({
+      model: config.model,
+      max_tokens: 1500,
+      system: `You write ecommerce copy for A/B tests.\n\n## The store\n\n${storeContext}`,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const text = response.content
+      .filter((block): block is Anthropic.TextBlock => block.type === "text")
+      .map((block) => block.text)
+      .join("\n");
+
+    const variants = z.array(z.string().min(1).max(2000)).parse(extractJson(text));
+    return NextResponse.json({ variants: variants.slice(0, input.count) });
+  } catch (error) {
+    console.error("[api/ai/generate-variants]", error);
+    const message = error instanceof Error ? error.message : "Generation failed";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

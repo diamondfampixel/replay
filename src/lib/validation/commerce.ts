@@ -2,6 +2,13 @@ import { z } from "zod";
 
 const money = z.coerce.number().min(0).max(1_000_000);
 
+// Null must be matched before any coercion runs: `z.coerce.number()` maps null
+// to 0 and `z.coerce.date()` maps it to the epoch, either of which would turn
+// "no value" into a real one.
+const nullableMoney = z.union([z.null(), money]).optional();
+const nullableInt = (max: number) => z.union([z.null(), z.coerce.number().int().min(1).max(max)]).optional();
+const nullableDate = z.union([z.null(), z.coerce.date()]).optional();
+
 export const discountInputSchema = z
   .object({
     title: z.string().trim().min(1, "Title is required").max(120),
@@ -16,9 +23,9 @@ export const discountInputSchema = z
     type: z.enum(["PERCENTAGE", "FIXED_AMOUNT", "FREE_SHIPPING", "BUY_X_GET_Y"]).default("PERCENTAGE"),
     status: z.enum(["DRAFT", "ACTIVE", "SCHEDULED", "EXPIRED", "DISABLED"]).default("DRAFT"),
     value: money.default(0),
-    minPurchase: z.union([money, z.null()]).optional(),
-    minQuantity: z.union([z.coerce.number().int().min(1).max(1000), z.null()]).optional(),
-    usageLimit: z.union([z.coerce.number().int().min(1).max(1_000_000), z.null()]).optional(),
+    minPurchase: nullableMoney,
+    minQuantity: nullableInt(1000),
+    usageLimit: nullableInt(1_000_000),
     oncePerCustomer: z.boolean().default(false),
     appliesToScope: z.enum(["all", "products", "collections"]).default("all"),
     productIds: z.array(z.string()).default([]),
@@ -27,7 +34,7 @@ export const discountInputSchema = z
     getQuantity: z.coerce.number().int().min(1).max(100).default(1),
     getDiscountPercent: z.coerce.number().min(1).max(100).default(100),
     startsAt: z.coerce.date().default(() => new Date()),
-    endsAt: z.union([z.coerce.date(), z.null()]).optional(),
+    endsAt: nullableDate,
   })
   .refine((data) => data.automatic || (data.code && data.code.length > 0), {
     message: "Add a discount code, or mark the discount automatic",
