@@ -67,7 +67,7 @@ Mobile-first and responsive.
 
 ### The assistant
 
-The assistant has **40 typed tools** covering analytics, catalog, collections,
+The assistant has **58 typed tools** (56 offered to the model; two are internal undo helpers) covering analytics, catalog, collections,
 orders, customers, discounts, experiments, storefront sections, content pages,
 reviews and settings. It reads real data and makes real changes:
 
@@ -207,7 +207,7 @@ npm run db:studio       # browse the data
 npm run db:reset        # drop, recreate and reseed
 ```
 
-The schema has 30 models. Key relationships:
+The schema has 40 models and 14 enums. Key relationships:
 
 - `Organization` owns `Store`s; `Membership` joins `User`s to `Organization`s with a `Role`
 - `Product` has `ProductImage`s, `ProductVariant`s, a `Category`, and many `Collection`s
@@ -418,7 +418,7 @@ unverified.
 
 ```
 prisma/
-  schema.prisma          30 models
+  schema.prisma          40 models, 14 enums
   seed.ts                demo business entry point
 src/
   app/
