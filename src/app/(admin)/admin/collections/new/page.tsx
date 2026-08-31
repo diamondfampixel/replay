@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { requireCapability } from "@/lib/session";
 import { toNumber } from "@/lib/money";
-import { CollectionForm, EMPTY_COLLECTION } from "@/components/admin/collection-form";
+import { CollectionForm } from "@/components/admin/collection-form";
+import { EMPTY_COLLECTION } from "@/lib/form-defaults";
 
 export const metadata: Metadata = { title: "New collection" };
 

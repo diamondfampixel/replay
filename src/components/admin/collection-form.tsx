@@ -33,10 +33,6 @@ export type CollectionFormValues = {
   seoDescription: string;
 };
 
-export const EMPTY_COLLECTION: CollectionFormValues = {
-  title: "", slug: "", description: "", imageUrl: null, type: "MANUAL",
-  match: "all", rules: [], productIds: [], visible: true, seoTitle: "", seoDescription: "",
-};
 
 const FIELDS = [
   { value: "tag", label: "Product tag" },

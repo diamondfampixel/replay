@@ -35,13 +35,11 @@ export type DiscountFormValues = {
   endsAt: string;
 };
 
-export const EMPTY_DISCOUNT: DiscountFormValues = {
-  title: "", code: "", automatic: false, type: "PERCENTAGE", status: "DRAFT",
-  value: "10", minPurchase: "", minQuantity: "", usageLimit: "", oncePerCustomer: false,
-  appliesToScope: "all", productIds: [], collectionIds: [],
-  buyQuantity: "2", getQuantity: "1", getDiscountPercent: "100",
-  startsAt: new Date().toISOString().slice(0, 16), endsAt: "",
-};
+
+function toLocalDateTimeInput(date: Date) {
+  const offset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
 
 function randomCode() {
   const words = ["SAVE", "EXTRA", "TREAT", "BONUS", "FRESH", "SPARK"];
@@ -66,7 +64,12 @@ export function DiscountForm({
   canWrite: boolean;
 }) {
   const router = useRouter();
-  const [values, setValues] = React.useState(initial);
+  const [values, setValues] = React.useState(() => ({
+    ...initial,
+    // A blank start date means "now" — resolved on the client so the value is
+    // in the operator's timezone rather than the server's.
+    startsAt: initial.startsAt || toLocalDateTimeInput(new Date()),
+  }));
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [pending, startTransition] = React.useTransition();
   const [confirmDelete, setConfirmDelete] = React.useState(false);

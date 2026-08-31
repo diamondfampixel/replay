@@ -51,13 +51,6 @@ export type ProductFormValues = {
   optionAxes: Array<{ name: string; values: string[] }>;
 };
 
-export const EMPTY_PRODUCT: ProductFormValues = {
-  title: "", slug: "", description: "", status: "DRAFT",
-  price: "", compareAtPrice: "", cost: "", sku: "", barcode: "",
-  trackInventory: true, inventory: "0", categoryId: "", collectionIds: [],
-  vendor: "", tags: [], seoTitle: "", seoDescription: "",
-  images: [], variants: [], optionAxes: [],
-};
 
 function toPayload(values: ProductFormValues) {
   const num = (value: string) => (value.trim() === "" ? null : Number(value));

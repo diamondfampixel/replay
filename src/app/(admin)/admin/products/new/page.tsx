@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { requireCapability } from "@/lib/session";
-import { EMPTY_PRODUCT, ProductForm } from "@/components/admin/product-form";
+import { ProductForm } from "@/components/admin/product-form";
+import { EMPTY_PRODUCT } from "@/lib/form-defaults";
 
 export const metadata: Metadata = { title: "New product" };
 
