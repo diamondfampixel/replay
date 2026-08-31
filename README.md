@@ -343,6 +343,18 @@ provisioning its own isolated organization:
 | `ai-chat-loop.test.ts` | The full tool-calling loop with the SDK mocked: text streaming, tool execution, result feeding, confirmation halting, failure handling, transcript persistence, round limits |
 | `pages.test.ts` | Draft isolation, publish semantics, discard, section validation, HTML sanitisation |
 | `permissions.test.ts` | Capability matrix per role, AI tool-surface filtering, integration validation, secrets never leaving the server |
+| `connected-loop.test.ts` | The whole system in one flow: the assistant creates a product, publishes it through the confirmation gate, it joins a collection and appears on the storefront, a shopper buys it with an AI-created discount, stock moves, the purchase converts the experiment that shopper was in, and the figures land in analytics and customer history |
+
+### Browser smoke test
+
+```bash
+npm run build && npm start &
+npm run smoke                      # or: node scripts/smoke-purchase.mjs <baseUrl> <storeSlug>
+```
+
+Drives a real purchase through a real browser: product page, variant selection,
+cart drawer, discount entry and checkout. Requires Playwright
+(`npm i -D playwright && npx playwright install chromium`).
 
 ---
 
@@ -380,6 +392,13 @@ checkout, analytics collection and dashboards, A/B testing end to end, the AI
 assistant and its 40 tools, the visual store editor with draft/publish, campaign
 authoring, review moderation, content pages, media upload, the integration
 framework, settings, audit logging and demo-data purge.
+
+**Verified how:** 113 automated tests against a real database, plus a browser
+smoke test that completes a purchase end to end. The assistant's tool-calling
+loop is covered with the Anthropic SDK mocked — the orchestration, risk gating,
+confirmation flow and transcript persistence are all exercised, but the build
+has not been run against the live Anthropic API, so model behaviour itself is
+unverified.
 
 **Deliberately not implemented, and labelled as such in the UI:**
 
