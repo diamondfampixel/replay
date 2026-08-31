@@ -310,3 +310,75 @@ describe("tenant isolation", () => {
     await cleanupTestStore(other.organization.id, other.user.id);
   });
 });
+
+describe("one approval executes an action once", () => {
+  /**
+   * The confirm endpoint is the gate on irreversible business changes, so
+   * single execution has to hold on the server rather than relying on the
+   * button being disabled.
+   */
+  it("executes a bulk price change once even when two confirmations race", async () => {
+    const product = await createProduct(ctx, {
+      title: "Race Product",
+      status: "ACTIVE",
+      price: 100,
+    });
+
+    const pending = await executeTool(
+      "adjust_prices",
+      { scope: "all", changeType: "percent", value: -25 },
+      ctx,
+    );
+    expect(pending.status).toBe("needs_confirmation");
+    if (pending.status !== "needs_confirmation") return;
+
+    const [first, second] = await Promise.all([
+      confirmPendingAction(pending.actionId, ctx),
+      confirmPendingAction(pending.actionId, ctx),
+    ]);
+
+    // Exactly one wins; the other is told it was already handled.
+    const outcomes = [first.status, second.status].sort();
+    expect(outcomes).toEqual(["executed", "failed"]);
+
+    const after = await testDb.product.findUniqueOrThrow({ where: { id: product.id } });
+    expect(Number(after.price)).toBeCloseTo(75, 2);
+
+    const rows = await testDb.aIAction.findMany({ where: { id: pending.actionId } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe("EXECUTED");
+  });
+
+  it("refuses a second confirmation made after the first has finished", async () => {
+    const pending = await executeTool(
+      "adjust_prices",
+      { scope: "all", changeType: "percent", value: -10 },
+      ctx,
+    );
+    if (pending.status !== "needs_confirmation") throw new Error("expected confirmation");
+
+    expect((await confirmPendingAction(pending.actionId, ctx)).status).toBe("executed");
+    const replay = await confirmPendingAction(pending.actionId, ctx);
+    expect(replay.status).toBe("failed");
+    if (replay.status === "failed") expect(replay.error).toMatch(/already been handled/i);
+  });
+
+  it("will not confirm an action belonging to another store", async () => {
+    const pending = await executeTool(
+      "adjust_prices",
+      { scope: "all", changeType: "percent", value: -5 },
+      ctx,
+    );
+    if (pending.status !== "needs_confirmation") throw new Error("expected confirmation");
+
+    const other = await createTestStore("ai-confirm-other");
+    const result = await confirmPendingAction(pending.actionId, other.ctx);
+    expect(result.status).toBe("failed");
+
+    const row = await testDb.aIAction.findUniqueOrThrow({ where: { id: pending.actionId } });
+    expect(row.status).toBe("PENDING_CONFIRMATION");
+
+    await cancelPendingAction(pending.actionId, ctx);
+    await cleanupTestStore(other.organization.id, other.user.id);
+  });
+});

@@ -163,6 +163,19 @@ export async function confirmPendingAction(actionId: string, ctx: ServiceContext
     return { status: "failed" as const, error: "That action has already been handled.", actionId: null };
   }
 
+  // Claim the action before running it. Reading the status and then executing
+  // leaves a window where two confirmations both pass the check above and the
+  // tool runs twice — on something like a bulk price change that would apply
+  // the discount twice off one approval. Only the request whose update matches
+  // a still-pending row proceeds.
+  const claimed = await prisma.aIAction.updateMany({
+    where: { id: actionId, storeId: ctx.storeId, status: "PENDING_CONFIRMATION" },
+    data: { status: "EXECUTING" },
+  });
+  if (claimed.count === 0) {
+    return { status: "failed" as const, error: "That action has already been handled.", actionId: null };
+  }
+
   const outcome = await executeTool(action.tool, action.params, ctx, {
     confirmed: true,
     conversationId: action.conversationId ?? undefined,
@@ -194,18 +207,37 @@ export async function undoAction(actionId: string, ctx: ServiceContext) {
   const undo = action.undoData as { tool: string; params: Record<string, unknown> } | null;
   if (!undo?.tool) throw new Error("This action cannot be undone automatically.");
 
-  const outcome = await executeTool(undo.tool, undo.params, ctx, {
-    confirmed: true,
-    prompt: `Undo of ${action.tool}`,
-  });
-  if (outcome.status !== "executed") {
-    throw new Error(outcome.status === "failed" ? outcome.error : "The undo could not be completed.");
-  }
-
-  await prisma.aIAction.update({
-    where: { id: actionId },
+  // Claimed the same way a confirmation is, and for the same reason: two undo
+  // requests that both read an EXECUTED row would otherwise each reverse it,
+  // and reversing a restore is not a no-op.
+  const claimed = await prisma.aIAction.updateMany({
+    where: { id: actionId, storeId: ctx.storeId, status: "EXECUTED", undoneAt: null },
     data: { status: "UNDONE", undoneAt: new Date() },
   });
+  if (claimed.count === 0) throw new Error("That action has already been undone.");
+
+  let outcome;
+  try {
+    outcome = await executeTool(undo.tool, undo.params, ctx, {
+      confirmed: true,
+      prompt: `Undo of ${action.tool}`,
+    });
+  } catch (error) {
+    // Hand the action back so a failed undo can be retried.
+    await prisma.aIAction.update({
+      where: { id: actionId },
+      data: { status: "EXECUTED", undoneAt: null },
+    });
+    throw error;
+  }
+
+  if (outcome.status !== "executed") {
+    await prisma.aIAction.update({
+      where: { id: actionId },
+      data: { status: "EXECUTED", undoneAt: null },
+    });
+    throw new Error(outcome.status === "failed" ? outcome.error : "The undo could not be completed.");
+  }
 
   return outcome.result;
 }

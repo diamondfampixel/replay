@@ -982,6 +982,9 @@ model AIMessage {
 
 enum AIActionStatus {
   PENDING_CONFIRMATION
+  // Claimed by a confirm request and currently running. The transition into
+  // this state is what stops one approval being executed twice.
+  EXECUTING
   EXECUTED
   FAILED
   CANCELLED
