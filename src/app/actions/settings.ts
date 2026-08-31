@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { audit, serviceContext } from "@/lib/services/context";
-import { requireContext } from "@/lib/session";
+import { requireContext, revokeOtherSessions } from "@/lib/session";
 import { fail, fromZodError, guard, ok } from "@/lib/action-result";
 import { assertCan } from "@/lib/permissions";
 import { hashPassword, verifyPassword } from "@/lib/auth";
@@ -253,7 +253,20 @@ export async function changePasswordAction(current: string, next: string) {
       where: { id: user.id },
       data: { passwordHash: await hashPassword(next) },
     });
-    return ok(null, "Password changed");
+
+    // Changing a password is how someone locks out a session they no longer
+    // trust, so the old ones go with it. The forgot-password flow already does
+    // this; the two paths should not differ.
+    const revoked = await revokeOtherSessions(user.id);
+
+    const sctx = await serviceContext();
+    await audit(sctx, "user.password", { type: "User", id: user.id }, { revokedSessions: revoked });
+    return ok(
+      null,
+      revoked > 0
+        ? `Password changed. ${revoked} other session${revoked === 1 ? "" : "s"} signed out.`
+        : "Password changed",
+    );
   });
 }
 

@@ -63,6 +63,25 @@ export async function destroySession() {
   jar.delete(SESSION_COOKIE);
 }
 
+/**
+ * Drops every session for a user except the one making the request.
+ *
+ * A password change is how someone evicts an attacker, so leaving the older
+ * cookies valid would defeat the point of it. The caller's own session is kept
+ * so changing a password does not sign you out of the tab you are using.
+ */
+export async function revokeOtherSessions(userId: string): Promise<number> {
+  const jar = await cookies();
+  const token = jar.get(SESSION_COOKIE)?.value;
+  const { count } = await prisma.session.deleteMany({
+    where: {
+      userId,
+      ...(token ? { NOT: { token: hashToken(token) } } : {}),
+    },
+  });
+  return count;
+}
+
 /** Cached per-request so repeated calls in a tree hit the database once. */
 export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const jar = await cookies();
