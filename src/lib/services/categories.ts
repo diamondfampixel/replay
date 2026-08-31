@@ -84,19 +84,29 @@ export async function updateCategory(ctx: ServiceContext, id: string, raw: unkno
   const input = parseProvided(categoryInputSchema, raw);
   if (input.parentId === id) throw new ValidationError("A category cannot be its own parent.");
 
-  // Prevent creating a cycle by walking up from the proposed parent.
   if (input.parentId) {
+    // The parent must live in this store. Without this the write below would
+    // happily point a category at another organization's tree, which
+    // createCategory already refuses to do.
+    const parent = await prisma.category.findFirst({
+      where: { id: input.parentId, storeId: ctx.storeId },
+      select: { id: true },
+    });
+    if (!parent) throw new NotFoundError("Parent category");
+
+    // Prevent creating a cycle by walking up from the proposed parent. The walk
+    // stays inside this store for the same reason.
     let cursor: string | null = input.parentId;
     const seen = new Set<string>();
     while (cursor) {
       if (cursor === id) throw new ValidationError("That would create a circular category tree.");
       if (seen.has(cursor)) break;
       seen.add(cursor);
-      const parent: { parentId: string | null } | null = await prisma.category.findUnique({
-        where: { id: cursor },
+      const next: { parentId: string | null } | null = await prisma.category.findFirst({
+        where: { id: cursor, storeId: ctx.storeId },
         select: { parentId: true },
       });
-      cursor = parent?.parentId ?? null;
+      cursor = next?.parentId ?? null;
     }
   }
 

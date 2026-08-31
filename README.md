@@ -343,6 +343,8 @@ provisioning its own isolated organization:
 | `ai-chat-loop.test.ts` | The full tool-calling loop with the SDK mocked: text streaming, tool execution, result feeding, confirmation halting, failure handling, transcript persistence, round limits |
 | `pages.test.ts` | Draft isolation, publish semantics, discard, section validation, HTML sanitisation |
 | `permissions.test.ts` | Capability matrix per role, AI tool-surface filtering, integration validation, secrets never leaving the server |
+| `categories.test.ts` | Tree nesting, cycle refusal, and that a category cannot be re-parented under, renamed in, or deleted from another store |
+| `sanitize-vectors.test.ts` | The sanitiser against 28 known XSS vectors plus 10 legitimate cases that must survive |
 | `connected-loop.test.ts` | The whole system in one flow: the assistant creates a product, publishes it through the confirmation gate, it joins a collection and appears on the storefront, a shopper buys it with an AI-created discount, stock moves, the purchase converts the experiment that shopper was in, and the figures land in analytics and customer history |
 
 ### Browser smoke test
@@ -400,7 +402,7 @@ assistant and its 40 tools, the visual store editor with draft/publish, campaign
 authoring, review moderation, content pages, media upload, the integration
 framework, settings, audit logging and demo-data purge.
 
-**Verified how:** 115 automated tests against a real database, plus a browser
+**Verified how:** 158 automated tests against a real database, plus a browser
 smoke test that completes a purchase end to end. The assistant's tool-calling
 loop is covered with the Anthropic SDK mocked — the orchestration, risk gating,
 confirmation flow and transcript persistence are all exercised, but the build
