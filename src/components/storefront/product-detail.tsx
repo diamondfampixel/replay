@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { Check, Minus, Plus, Truck, Undo2 } from "lucide-react";
 import { useCart } from "@/components/storefront/cart-provider";
 import { StorefrontAnalytics } from "@/components/storefront/analytics";
@@ -53,7 +52,6 @@ export function ProductDetail({
   recommended: ProductCardData[];
 }) {
   const { add } = useCart();
-  const [imageIndex, setImageIndex] = React.useState(0);
   const [quantity, setQuantity] = React.useState(1);
   const [adding, setAdding] = React.useState(false);
   const [added, setAdded] = React.useState(false);
@@ -94,11 +92,18 @@ export function ProductDetail({
   const needsSelection = product.variants.length > 0 && !selectedVariant;
   const soldOut = !needsSelection && product.trackInventory && available <= 0;
 
-  React.useEffect(() => {
-    if (!selectedVariant?.imageUrl) return;
+  // Choosing a variant moves the gallery to that variant's image, unless the
+  // shopper has since picked a different one for this same variant.
+  const variantKey = selectedVariant?.id ?? "";
+  const variantImageIndex = React.useMemo(() => {
+    if (!selectedVariant?.imageUrl) return 0;
     const index = product.images.findIndex((image) => image.url === selectedVariant.imageUrl);
-    if (index >= 0) setImageIndex(index);
+    return index >= 0 ? index : 0;
   }, [selectedVariant, product.images]);
+
+  const [manualImage, setManualImage] = React.useState<{ key: string; index: number } | null>(null);
+  const imageIndex = manualImage?.key === variantKey ? manualImage.index : variantImageIndex;
+  const setImageIndex = (index: number) => setManualImage({ key: variantKey, index });
 
   async function onAdd() {
     setAdding(true);

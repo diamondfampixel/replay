@@ -3,7 +3,7 @@ import Link from "next/link";
 import { History } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { requireCapability } from "@/lib/session";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/states";
 import { PageHeader } from "@/components/ui/page";

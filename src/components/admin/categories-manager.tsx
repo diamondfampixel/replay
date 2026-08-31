@@ -215,30 +215,33 @@ function CategoryRow({
   );
 }
 
-function CategoryDialog({
-  open, onOpenChange, node, parentId, categories, onSaved,
-}: {
+type CategoryDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   node?: CategoryNode;
   parentId?: string;
   categories: FlatCategory[];
   onSaved: () => void;
-}) {
+};
+
+function CategoryDialog(props: CategoryDialogProps) {
+  // Remounting per target resets the form without an effect.
+  return props.open ? (
+    <CategoryDialogForm key={props.node?.id ?? props.parentId ?? "new"} {...props} />
+  ) : null;
+}
+
+function CategoryDialogForm({
+  open, onOpenChange, node, parentId, categories, onSaved,
+}: CategoryDialogProps) {
   const [pending, startTransition] = React.useTransition();
   const [errors, setErrors] = React.useState<Record<string, string>>({});
-  const [values, setValues] = React.useState({ name: "", slug: "", description: "", parentId: "" });
-
-  React.useEffect(() => {
-    if (!open) return;
-    setErrors({});
-    setValues({
-      name: node?.name ?? "",
-      slug: node?.slug ?? "",
-      description: node?.description ?? "",
-      parentId: node?.parentId ?? parentId ?? "",
-    });
-  }, [open, node, parentId]);
+  const [values, setValues] = React.useState({
+    name: node?.name ?? "",
+    slug: node?.slug ?? "",
+    description: node?.description ?? "",
+    parentId: node?.parentId ?? parentId ?? "",
+  });
 
   function save() {
     setErrors({});

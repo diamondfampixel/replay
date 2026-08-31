@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Sidebar } from "@/components/admin/sidebar";
@@ -9,6 +9,7 @@ import { CommandBarProvider } from "@/components/admin/command-bar";
 import { AssistantPanelProvider } from "@/components/admin/assistant-panel";
 import type { Role } from "@/generated/prisma/client";
 import { cn } from "@/lib/utils";
+import { useLocalFlag } from "@/lib/client-state";
 
 const COLLAPSE_KEY = "halyard.sidebar.collapsed";
 
@@ -32,29 +33,19 @@ export function AdminShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useLocalFlag(COLLAPSE_KEY, false);
 
-  useEffect(() => {
-    try {
-      setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "1");
-    } catch {
-      /* storage unavailable */
-    }
-  }, []);
+  // The drawer records the route it was opened on, so a navigation closes it
+  // without an effect that reaches back into state.
+  const [drawer, setDrawer] = useState<{ open: boolean; path: string }>({ open: false, path: pathname });
+  const mobileOpen = drawer.open && drawer.path === pathname;
 
-  useEffect(() => setMobileOpen(false), [pathname]);
+  function setMobileOpen(open: boolean) {
+    setDrawer({ open, path: pathname });
+  }
 
   function toggle() {
-    setCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(COLLAPSE_KEY, next ? "1" : "0");
-      } catch {
-        /* storage unavailable */
-      }
-      return next;
-    });
+    setCollapsed(!collapsed);
   }
 
   return (

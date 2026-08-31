@@ -5,11 +5,11 @@ import { prisma } from "@/lib/db";
 import { requireCapability } from "@/lib/session";
 import { can } from "@/lib/permissions";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { DemoTag, EmptyState } from "@/components/ui/states";
+
+import { EmptyState } from "@/components/ui/states";
 import { PageHeader } from "@/components/ui/page";
-import { Table, TableWrap, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { formatDate } from "@/lib/format";
+
+
 import { SubscribersTable } from "@/components/admin/subscribers-table";
 
 export const metadata: Metadata = { title: "Subscribers" };

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { getStore } from "@/lib/storefront/data";
 import { getCartView } from "@/lib/services/cart";
+import { getStorefrontSessionId } from "@/lib/storefront/session";
 import { StorefrontHeader } from "@/components/storefront/header";
 import { StorefrontFooter } from "@/components/storefront/footer";
 import { StorefrontAnalytics } from "@/components/storefront/analytics";
@@ -31,7 +32,7 @@ export default async function StorefrontLayout({
 }) {
   const { storeSlug } = await params;
   const store = await getStore(storeSlug);
-  const cart = await getCartView(store.id);
+  const [cart, sessionId] = await Promise.all([getCartView(store.id), getStorefrontSessionId()]);
 
   return (
     <div
@@ -44,7 +45,7 @@ export default async function StorefrontLayout({
       }
     >
       <Suspense>
-        <StorefrontAnalytics storeSlug={storeSlug}>
+        <StorefrontAnalytics storeSlug={storeSlug} sessionId={sessionId}>
           <CartProvider storeSlug={storeSlug} initialCart={cart}>
             <StorefrontHeader store={store} />
             <main className="flex-1">{children}</main>

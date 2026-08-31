@@ -32,9 +32,16 @@ export function DataToolbar({
   const pathname = usePathname();
   const params = useSearchParams();
   const [, startTransition] = useTransition();
-  const [query, setQuery] = useState(params.get("q") ?? "");
+  const urlQuery = params.get("q") ?? "";
+  const [query, setQuery] = useState(urlQuery);
+  const [lastUrlQuery, setLastUrlQuery] = useState(urlQuery);
 
-  useEffect(() => setQuery(params.get("q") ?? ""), [params]);
+  // The URL is the source of truth; adopt it when it changes underneath us
+  // (back/forward, a cleared filter) without clobbering in-flight typing.
+  if (urlQuery !== lastUrlQuery) {
+    setLastUrlQuery(urlQuery);
+    setQuery(urlQuery);
+  }
 
   function update(next: Record<string, string | null>) {
     const search = new URLSearchParams(params.toString());

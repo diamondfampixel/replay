@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
 import { ExternalLink, PanelLeftClose, PanelLeft, Search } from "lucide-react";
 import { Wordmark, Logomark } from "@/components/brand";
 import { NavIcon } from "@/components/admin/icon";
@@ -11,6 +10,7 @@ import { can, type Capability } from "@/lib/permissions";
 import type { Role } from "@/generated/prisma/client";
 import { cn } from "@/lib/utils";
 import { useCommandBar } from "@/components/admin/command-bar";
+import { useIsMac } from "@/lib/client-state";
 
 export function Sidebar({
   role,
@@ -29,10 +29,7 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const commandBar = useCommandBar();
-  const [mac, setMac] = useState(false);
-  useEffect(() => {
-    setMac(/Mac|iPhone|iPad/.test(navigator.platform ?? ""));
-  }, []);
+  const mac = useIsMac();
 
   return (
     <div className="flex h-full flex-col bg-white">

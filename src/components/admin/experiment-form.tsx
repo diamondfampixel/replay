@@ -54,25 +54,20 @@ export function ExperimentForm({
     [sections, pageId],
   );
 
-  // Seed the control with whatever is live today so the test is honest.
-  React.useEffect(() => {
-    if (targetType !== "page") return;
-    const section = pageSections.find((s) => s.id === sectionId) ?? pageSections[0];
-    if (!section) return;
-    if (!sectionId) setSectionId(section.id);
-    setVariants((prev) =>
-      prev.map((variant, index) => (index === 0 && !variant.value ? { ...variant, value: section.currentValue } : variant)),
-    );
-  }, [pageSections, sectionId, targetType]);
+  const activeSection = pageSections.find((section) => section.id === sectionId) ?? pageSections[0];
 
-  React.useEffect(() => {
-    if (targetType !== "product") return;
-    const product = products.find((p) => p.id === productId);
-    if (!product) return;
-    setVariants((prev) =>
-      prev.map((variant, index) => (index === 0 && !variant.value ? { ...variant, value: product.label } : variant)),
-    );
-  }, [productId, products, targetType]);
+  // The control should show whatever is live today, so the test compares
+  // against reality rather than a blank field. Derived, so switching target
+  // updates it — unless the operator has typed their own control copy.
+  const liveControl =
+    targetType === "page"
+      ? activeSection?.currentValue ?? ""
+      : products.find((product) => product.id === productId)?.label ?? "";
+
+  const [controlEdited, setControlEdited] = React.useState(false);
+  const resolvedVariants = variants.map((variant, index) =>
+    index === 0 && !controlEdited ? { ...variant, value: liveControl } : variant,
+  );
 
   function rebalance(next: VariantDraft[]) {
     const share = Math.floor(100 / next.length);
@@ -92,11 +87,11 @@ export function ExperimentForm({
         body: JSON.stringify({
           testType,
           field,
-          control: variants[0]?.value ?? "",
+          control: resolvedVariants[0]?.value ?? "",
           targetType,
           pageId: targetType === "page" ? pageId : null,
           productId: targetType === "product" ? productId : null,
-          count: Math.max(1, variants.length - 1),
+          count: Math.max(1, resolvedVariants.length - 1),
         }),
       });
       const data = await response.json();
@@ -104,9 +99,12 @@ export function ExperimentForm({
 
       setVariants((prev) =>
         prev.map((variant, index) =>
-          index === 0 ? variant : { ...variant, value: data.variants[index - 1] ?? variant.value },
+          index === 0
+            ? { ...variant, value: liveControl }
+            : { ...variant, value: data.variants[index - 1] ?? variant.value },
         ),
       );
+      setControlEdited(true);
       toast.success("Variants generated — edit them before starting the test.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not generate variants");
@@ -124,9 +122,9 @@ export function ExperimentForm({
         targetType,
         pageId: targetType === "page" ? pageId : null,
         productId: targetType === "product" ? productId : null,
-        sectionId: targetType === "page" ? sectionId || null : null,
+        sectionId: targetType === "page" ? sectionId || activeSection?.id || null : null,
         goal,
-        variants: variants.map((variant) => ({
+        variants: resolvedVariants.map((variant) => ({
           name: variant.name,
           isControl: variant.isControl,
           weight: variant.weight,
@@ -142,11 +140,11 @@ export function ExperimentForm({
     });
   }
 
-  const totalWeight = variants.reduce((sum, variant) => sum + variant.weight, 0);
+  const totalWeight = resolvedVariants.reduce((sum, variant) => sum + variant.weight, 0);
   const valid =
     name.trim().length > 0 &&
     totalWeight === 100 &&
-    variants.every((variant) => variant.value.trim().length > 0) &&
+    resolvedVariants.every((variant) => variant.value.trim().length > 0) &&
     (targetType === "page" ? Boolean(pageId) : Boolean(productId));
 
   return (
@@ -215,7 +213,11 @@ export function ExperimentForm({
                   </Select>
                 </Field>
                 <Field label="Section" htmlFor="sectionId" hint="The section whose copy is swapped.">
-                  <Select id="sectionId" value={sectionId} onChange={(event) => setSectionId(event.target.value)}>
+                  <Select
+                    id="sectionId"
+                    value={sectionId || activeSection?.id || ""}
+                    onChange={(event) => setSectionId(event.target.value)}
+                  >
                     {pageSections.length === 0 && <option value="">No sections on this page</option>}
                     {pageSections.map((section) => (
                       <option key={section.id} value={section.id}>{section.label}</option>
@@ -246,7 +248,7 @@ export function ExperimentForm({
             <div className="flex gap-2">
               {aiConfigured && (
                 <Button size="sm" variant="secondary" onClick={generateVariants} loading={generating}
-                  disabled={!variants[0]?.value.trim()}>
+                  disabled={!resolvedVariants[0]?.value.trim()}>
                   <Sparkles className="text-pine-600" />
                   Generate with AI
                 </Button>
@@ -273,7 +275,7 @@ export function ExperimentForm({
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {variants.map((variant, index) => (
+            {resolvedVariants.map((variant, index) => (
               <div key={index} className="rounded-md border border-ink-200 p-3">
                 <div className="mb-2 flex items-center gap-2">
                   <Badge tone={variant.isControl ? "solid" : "outline"}>
@@ -309,9 +311,12 @@ export function ExperimentForm({
                 <Textarea
                   rows={field === "description" ? 4 : 2}
                   value={variant.value}
-                  onChange={(event) =>
-                    setVariants((prev) => prev.map((v, i) => (i === index ? { ...v, value: event.target.value } : v)))
-                  }
+                  onChange={(event) => {
+                    if (index === 0) setControlEdited(true);
+                    setVariants((prev) =>
+                      prev.map((v, i) => (i === index ? { ...v, value: event.target.value } : v)),
+                    );
+                  }}
                   placeholder={variant.isControl ? "The copy that is live today" : "Your alternative"}
                 />
               </div>

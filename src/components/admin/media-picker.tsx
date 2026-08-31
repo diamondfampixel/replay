@@ -29,46 +29,57 @@ async function uploadFiles(files: File[]): Promise<MediaAssetLite[]> {
 }
 
 /** Modal library + uploader. Returns the chosen image URLs to the caller. */
-export function MediaLibraryDialog({
-  open,
-  onOpenChange,
-  onSelect,
-  multiple = false,
-}: {
+type MediaLibraryDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (urls: string[]) => void;
   multiple?: boolean;
-}) {
-  const [assets, setAssets] = React.useState<MediaAssetLite[]>([]);
-  const [loading, setLoading] = React.useState(false);
+};
+
+/** Remounts each time it opens so the selection starts empty. */
+export function MediaLibraryDialog(props: MediaLibraryDialogProps) {
+  return props.open ? <MediaLibraryDialogInner key="open" {...props} /> : null;
+}
+
+function MediaLibraryDialogInner({
+  open,
+  onOpenChange,
+  onSelect,
+  multiple = false,
+}: MediaLibraryDialogProps) {
+  // One state transition, applied after the request resolves, so the effect
+  // never writes state synchronously.
+  const [library, setLibrary] = React.useState<{ loaded: boolean; assets: MediaAssetLite[] }>({
+    loaded: false,
+    assets: [],
+  });
   const [uploading, setUploading] = React.useState(false);
   const [selected, setSelected] = React.useState<string[]>([]);
   const [query, setQuery] = React.useState("");
 
-  const load = React.useCallback(async (search: string) => {
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/admin/media?q=${encodeURIComponent(search)}`);
-      const data = await response.json();
-      if (response.ok) setAssets(data.assets);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const assets = library.assets;
+  const loading = !library.loaded;
 
   React.useEffect(() => {
     if (!open) return;
-    setSelected([]);
-    load(query);
-  }, [open, query, load]);
+    const controller = new AbortController();
+    fetch(`/api/admin/media?q=${encodeURIComponent(query)}`, { signal: controller.signal })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (data) setLibrary({ loaded: true, assets: data.assets });
+      })
+      .catch(() => {
+        /* aborted or offline — the existing list stays on screen */
+      });
+    return () => controller.abort();
+  }, [open, query]);
 
   async function onFiles(files: FileList | null) {
     if (!files?.length) return;
     setUploading(true);
     try {
       const uploaded = await uploadFiles(Array.from(files));
-      setAssets((prev) => [...uploaded, ...prev]);
+      setLibrary((prev) => ({ loaded: true, assets: [...uploaded, ...prev.assets] }));
       setSelected(multiple ? uploaded.map((a) => a.url) : [uploaded[0].url]);
       toast.success(`${uploaded.length} file${uploaded.length === 1 ? "" : "s"} uploaded`);
     } catch (error) {

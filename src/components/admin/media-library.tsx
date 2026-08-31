@@ -45,10 +45,13 @@ export function MediaLibrary({
   const [uploading, setUploading] = React.useState(false);
   const [selected, setSelected] = React.useState<Asset | null>(null);
   const [confirmDelete, setConfirmDelete] = React.useState<Asset | null>(null);
-  const [alt, setAlt] = React.useState("");
+  const [altDraft, setAltDraft] = React.useState<{ id: string; value: string } | null>(null);
   const [pending, startTransition] = React.useTransition();
 
-  React.useEffect(() => setAlt(selected?.alt ?? ""), [selected]);
+  // The draft is keyed by asset, so selecting a different file shows its own
+  // alt text without an effect resetting the field.
+  const alt = altDraft && selected && altDraft.id === selected.id ? altDraft.value : selected?.alt ?? "";
+  const setAlt = (value: string) => selected && setAltDraft({ id: selected.id, value });
 
   async function upload(files: FileList | null) {
     if (!files?.length) return;

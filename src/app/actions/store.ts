@@ -8,7 +8,7 @@ import {
   createContentPage, deleteContentPage, discardDraft, publishPage,
   saveDraftSections, updateContentPage, type ContentPageInput,
 } from "@/lib/services/pages";
-import { applyGeneratedStore, generateStoreConfig } from "@/lib/ai/store-builder";
+import { generateStoreConfig } from "@/lib/ai/store-builder";
 import { isAIConfigured } from "@/lib/ai/config";
 import { audit } from "@/lib/services/context";
 

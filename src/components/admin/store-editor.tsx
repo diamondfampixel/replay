@@ -67,6 +67,12 @@ export function StoreEditor({
   const [previewKey, setPreviewKey] = React.useState(0);
   const [staged, setStaged] = React.useState(hasUnpublishedChanges);
 
+  // Draft ids only need to be unique within this editing session; a counter
+  // keeps them deterministic instead of reading the clock.
+  const idPrefix = React.useId();
+  const idCounter = React.useRef(0);
+  const nextDraftId = () => `draft-${idPrefix}-${idCounter.current++}`;
+
   const selected = sections.find((section) => section.id === selectedId) ?? null;
 
   function mutate(next: EditorSection[]) {
@@ -131,7 +137,7 @@ export function StoreEditor({
 
   function addSection(type: SectionType) {
     const section: EditorSection = {
-      id: `draft-${Date.now()}`,
+      id: nextDraftId(),
       type,
       visible: true,
       config: defaultSectionConfig(type),
@@ -302,7 +308,7 @@ export function StoreEditor({
                       type="button"
                       onClick={() => {
                         const index = sections.findIndex((s) => s.id === selected.id);
-                        const copy = { ...selected, id: `draft-${Date.now()}` };
+                        const copy = { ...selected, id: nextDraftId() };
                         const next = [...sections];
                         next.splice(index + 1, 0, copy);
                         mutate(next);

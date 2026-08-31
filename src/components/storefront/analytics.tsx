@@ -3,22 +3,6 @@
 import * as React from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
-const SESSION_KEY = "halyard.session";
-
-function readSessionId(): string {
-  if (typeof window === "undefined") return "";
-  try {
-    let id = sessionStorage.getItem(SESSION_KEY);
-    if (!id) {
-      id = `s_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
-      sessionStorage.setItem(SESSION_KEY, id);
-    }
-    return id;
-  } catch {
-    return "";
-  }
-}
-
 const SessionContext = React.createContext<string>("");
 
 export function useStorefrontSession() {
@@ -34,6 +18,7 @@ export type ExperimentAssignmentLite = { experimentId: string; variantId: string
  */
 export function StorefrontAnalytics({
   storeSlug,
+  sessionId: sessionIdProp,
   type = "page_view",
   productId,
   collectionId,
@@ -41,6 +26,11 @@ export function StorefrontAnalytics({
   children,
 }: {
   storeSlug: string;
+  /**
+   * Set by middleware and read server-side, so the browser and the server
+   * agree on which session an event belongs to. Nested trackers inherit it.
+   */
+  sessionId?: string;
   type?: "page_view" | "product_view" | "collection_view";
   productId?: string | null;
   collectionId?: string | null;
@@ -49,12 +39,9 @@ export function StorefrontAnalytics({
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [sessionId, setSessionId] = React.useState("");
+  const inherited = React.useContext(SessionContext);
+  const sessionId = sessionIdProp ?? inherited;
   const sent = React.useRef<string>("");
-
-  React.useEffect(() => {
-    setSessionId(readSessionId());
-  }, []);
 
   React.useEffect(() => {
     if (!sessionId) return;

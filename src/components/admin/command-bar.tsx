@@ -79,12 +79,10 @@ export function CommandBarProvider({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // Debounced record search.
+  // Debounced record search. Short queries are filtered out when rendering
+  // rather than by clearing state, so no effect writes state synchronously.
   React.useEffect(() => {
-    if (!isOpen || query.trim().length < 2) {
-      setHits([]);
-      return;
-    }
+    if (!isOpen || query.trim().length < 2) return;
     const controller = new AbortController();
     const timer = setTimeout(async () => {
       setLoading(true);
@@ -138,7 +136,8 @@ export function CommandBarProvider({
       result.push({ kind: "action", label: action.label, href: action.href, group: "Actions" });
     }
 
-    for (const hit of hits) result.push({ kind: "hit", hit });
+    // Stale results from a previous, longer query must not leak through.
+    if (q.length >= 2) for (const hit of hits) result.push({ kind: "hit", hit });
 
     if (q && !looksLikeQuestion(query)) {
       result.push({ kind: "ai", prompt: query.trim() });
@@ -146,7 +145,12 @@ export function CommandBarProvider({
     return result;
   }, [query, navItems, hits]);
 
-  React.useEffect(() => setCursor(0), [query]);
+  // Reset the highlighted row whenever the candidate list changes.
+  const [cursorKey, setCursorKey] = React.useState(query);
+  if (cursorKey !== query) {
+    setCursorKey(query);
+    setCursor(0);
+  }
 
   const go = React.useCallback(
     (row: Row) => {

@@ -58,7 +58,17 @@ export function EditCustomerButton({
   );
 }
 
-function CustomerDialog({
+function CustomerDialog(props: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initial: CustomerFormValues;
+  customerId?: string;
+}) {
+  // Remounting on open is the simplest way to reset the form to `initial`.
+  return props.open ? <CustomerDialogForm key={String(props.open)} {...props} /> : null;
+}
+
+function CustomerDialogForm({
   open, onOpenChange, initial, customerId,
 }: {
   open: boolean;
@@ -71,13 +81,6 @@ function CustomerDialog({
   const [errors, setErrors] = React.useState<Record<string, string>>({});
   const [tagDraft, setTagDraft] = React.useState("");
   const [pending, startTransition] = React.useTransition();
-
-  React.useEffect(() => {
-    if (open) {
-      setValues(initial);
-      setErrors({});
-    }
-  }, [open, initial]);
 
   function set<K extends keyof CustomerFormValues>(key: K, value: CustomerFormValues[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));

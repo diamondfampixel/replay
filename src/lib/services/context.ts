@@ -87,7 +87,6 @@ export async function uniqueStoreSlug(
   const root = desired || "item";
   let candidate = root;
   let n = 1;
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const where = { storeId, slug: candidate } as never;
     const existing =

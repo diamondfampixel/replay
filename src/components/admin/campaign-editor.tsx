@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, GripVertical, Image as ImageIcon, Minus, MoveVertical, Package,
-  Plus, Send, Trash2, Type, Heading, MousePointerClick,
+  Send, Trash2, Type, Heading, MousePointerClick,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";

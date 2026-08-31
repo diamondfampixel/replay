@@ -38,11 +38,17 @@ export function CartProvider({
 }) {
   const sessionId = useStorefrontSession();
   const [cart, setCart] = React.useState(initialCart);
+  const [serverCart, setServerCart] = React.useState(initialCart);
   const [pending, startTransition] = React.useTransition();
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
-  // Keep in step when the server re-renders the layout after a mutation.
-  React.useEffect(() => setCart(initialCart), [initialCart]);
+  // The server re-renders the layout after every mutation. Adopting the new
+  // value during render (rather than in an effect) avoids a second paint with
+  // stale totals.
+  if (initialCart !== serverCart) {
+    setServerCart(initialCart);
+    setCart(initialCart);
+  }
 
   const add = React.useCallback(
     async (productId: string, variantId: string | null, quantity: number) => {
