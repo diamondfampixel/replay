@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="img" aria-label="Summer">
+  <rect width="1600" height="900" fill="#efe9ea"/>
+  <circle cx="1180" cy="330" r="300" fill="#d7c6c8"/>
+  <circle cx="1180" cy="330" r="150" fill="#0E7C66" opacity="0.18"/>
+  <rect x="0" y="640" width="1600" height="260" fill="#d7c6c8" opacity="0.5"/>
+  <rect x="120" y="700" width="420" height="14" rx="7" fill="#443639" opacity="0.25"/>
+  <rect x="120" y="736" width="280" height="14" rx="7" fill="#443639" opacity="0.15"/>
+</svg>

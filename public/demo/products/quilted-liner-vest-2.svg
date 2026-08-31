@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800" role="img" aria-label="Quilted Liner Vest">
+  <rect width="800" height="800" fill="#f2efe9"/>
+  <path d="M240 620 A160 160 0 0 1 560 620 Z" fill="#ded5c6"/>
+              <circle cx="400" cy="340" r="96" fill="#b4331f" opacity="0.18"/>
+  <rect x="0" y="712" width="800" height="88" fill="#f2efe9"/>
+  <text x="400" y="756" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="24" letter-spacing="4" fill="#453b36">QUILTED LINER VEST</text>
+  <rect x="0" y="0" width="800" height="800" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="2"/>
+</svg>

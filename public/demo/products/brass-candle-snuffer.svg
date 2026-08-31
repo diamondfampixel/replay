@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800" role="img" aria-label="Brass Candle Snuffer">
+  <rect width="800" height="800" fill="#eceae4"/>
+  <path d="M250 620 L400 240 L550 620 Z" fill="#cdc9bd"/>
+              <path d="M330 620 L400 430 L470 620 Z" fill="#0e7c66" opacity="0.2"/>
+  <rect x="0" y="712" width="800" height="88" fill="#eceae4"/>
+  <text x="400" y="756" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="24" letter-spacing="4" fill="#3b3a34">BRASS CANDLE SNUFFER</text>
+  <rect x="0" y="0" width="800" height="800" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="2"/>
+</svg>

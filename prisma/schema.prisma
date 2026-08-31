@@ -1,0 +1,1043 @@
+// Halyard — AI commerce operating system
+// Multi-tenant: User -> Membership -> Organization -> Store -> (all business data)
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Identity & tenancy
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships     Membership[]
+  sessions        Session[]
+  aiConversations AIConversation[]
+  auditLogs       AuditLog[]
+  passwordResets  PasswordResetToken[]
+  notifications   Notification[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  userAgent String?
+  ip        String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MARKETING
+  SUPPORT
+  ANALYST
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  plan      String   @default("demo") // demo | starter | growth | pro
+  isDemo    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships Membership[]
+  stores      Store[]
+  auditLogs   AuditLog[]
+}
+
+model Membership {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String
+  role           Role     @default(OWNER)
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+}
+
+// ---------------------------------------------------------------------------
+// Store & storefront configuration
+// ---------------------------------------------------------------------------
+
+enum StoreStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+}
+
+model Store {
+  id             String      @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String      @unique
+  status         StoreStatus @default(DRAFT)
+  isDemo         Boolean     @default(false)
+
+  // business profile (drives AI context + onboarding)
+  industry     String?
+  description  String?
+  targetCustomer String?
+  brandPersonality String?
+
+  // brand
+  logoUrl        String?
+  primaryColor   String  @default("#0E7C66")
+  secondaryColor String  @default("#111827")
+  fontHeading    String  @default("Inter")
+  fontBody       String  @default("Inter")
+
+  // commerce config
+  currency     String  @default("USD")
+  timezone     String  @default("America/New_York")
+  contactEmail String?
+  supportPhone String?
+  domain       String?
+  customDomain String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  settings       StoreSettings?
+  pages          Page[]
+  products       Product[]
+  categories     Category[]
+  collections    Collection[]
+  customers      Customer[]
+  orders         Order[]
+  discounts      Discount[]
+  reviews        Review[]
+  events         AnalyticsEvent[]
+  dailyStats     AnalyticsDaily[]
+  experiments    Experiment[]
+  campaigns      EmailCampaign[]
+  subscribers    EmailSubscriber[]
+  integrations   Integration[]
+  mediaAssets    MediaAsset[]
+  navigationItems NavigationItem[]
+  conversations  AIConversation[]
+  aiActions      AIAction[]
+  notifications  Notification[]
+  carts          Cart[]
+
+  @@index([organizationId])
+}
+
+model StoreSettings {
+  id      String @id @default(cuid())
+  storeId String @unique
+
+  // shipping
+  shippingZones Json @default("[]")
+  freeShippingThreshold Decimal? @db.Decimal(10, 2)
+
+  // tax (placeholder — real tax calculation is NOT implemented)
+  taxEnabled  Boolean @default(false)
+  taxRate     Decimal @default(0) @db.Decimal(5, 4)
+  taxIncluded Boolean @default(false)
+
+  // notifications
+  notifyNewOrder      Boolean @default(true)
+  notifyLowInventory  Boolean @default(true)
+  lowInventoryThreshold Int   @default(5)
+  notifyExperimentDone Boolean @default(true)
+
+  // AI preferences
+  aiConfirmHighImpact Boolean @default(true)
+  aiTone              String  @default("professional")
+  aiAutoApplyLowRisk  Boolean @default(true)
+
+  // checkout
+  checkoutMode String @default("simulated") // simulated | stripe
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+}
+
+model NavigationItem {
+  id       String  @id @default(cuid())
+  storeId  String
+  label    String
+  href     String
+  position Int     @default(0)
+  group    String  @default("main") // main | footer
+  parentId String?
+
+  store    Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  parent   NavigationItem?  @relation("NavChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children NavigationItem[] @relation("NavChildren")
+
+  @@index([storeId, group])
+}
+
+enum PageType {
+  HOME
+  STANDARD
+  LANDING
+}
+
+model Page {
+  id      String   @id @default(cuid())
+  storeId String
+  type    PageType @default(STANDARD)
+  title   String
+  slug    String
+  // rich-text body for STANDARD content pages (About/FAQ/etc.)
+  body    String?
+  published Boolean @default(true)
+  showInNav Boolean @default(false)
+
+  seoTitle       String?
+  seoDescription String?
+
+  // publishing: draft sections live on the section rows; publishedAt marks last publish
+  publishedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store    Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  sections PageSection[]
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+}
+
+model PageSection {
+  id       String  @id @default(cuid())
+  pageId   String
+  type     String // hero | imageHero | featuredProducts | productGrid | collectionGrid | text | imageText | testimonials | reviews | benefits | faq | newsletter | announcement | customBanner
+  position Int     @default(0)
+  visible  Boolean @default(true)
+  // JSON configuration rendered by the storefront section renderer
+  config   Json    @default("{}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, position])
+}
+
+// ---------------------------------------------------------------------------
+// Catalog
+// ---------------------------------------------------------------------------
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model Category {
+  id          String  @id @default(cuid())
+  storeId     String
+  name        String
+  slug        String
+  description String?
+  parentId    String?
+  position    Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store    Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+}
+
+model Product {
+  id      String        @id @default(cuid())
+  storeId String
+  title   String
+  slug    String
+  description String?
+  status  ProductStatus @default(DRAFT)
+  isDemo  Boolean       @default(false)
+
+  price          Decimal  @db.Decimal(10, 2)
+  compareAtPrice Decimal? @db.Decimal(10, 2)
+  cost           Decimal? @db.Decimal(10, 2)
+
+  sku     String?
+  barcode String?
+
+  trackInventory Boolean @default(true)
+  inventory      Int     @default(0)
+
+  categoryId String?
+  vendor     String?
+  tags       String[] @default([])
+
+  seoTitle       String?
+  seoDescription String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store       Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  category    Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  images      ProductImage[]
+  variants    ProductVariant[]
+  collections CollectionProduct[]
+  orderItems  OrderItem[]
+  reviews     Review[]
+  cartItems   CartItem[]
+
+  @@unique([storeId, slug])
+  @@index([storeId, status])
+  @@index([categoryId])
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  url       String
+  alt       String?
+  position  Int     @default(0)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, position])
+}
+
+model ProductVariant {
+  id        String  @id @default(cuid())
+  productId String
+  title     String // "Black / Small"
+  // option map e.g. { "Size": "Small", "Color": "Black" }
+  options   Json    @default("{}")
+  sku       String?
+  price     Decimal? @db.Decimal(10, 2)
+  inventory Int     @default(0)
+  imageUrl  String?
+  position  Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+  cartItems  CartItem[]
+
+  @@index([productId])
+}
+
+enum CollectionType {
+  MANUAL
+  AUTOMATIC
+}
+
+model Collection {
+  id          String         @id @default(cuid())
+  storeId     String
+  title       String
+  slug        String
+  description String?
+  imageUrl    String?
+  type        CollectionType @default(MANUAL)
+  // rule set for AUTOMATIC: { match: "all"|"any", rules: [{field, operator, value}] }
+  rules       Json           @default("{\"match\":\"all\",\"rules\":[]}")
+  visible     Boolean        @default(true)
+  position    Int            @default(0)
+
+  seoTitle       String?
+  seoDescription String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store    Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  products CollectionProduct[]
+
+  @@unique([storeId, slug])
+  @@index([storeId])
+}
+
+model CollectionProduct {
+  collectionId String
+  productId    String
+  position     Int    @default(0)
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, productId])
+  @@index([productId])
+}
+
+// ---------------------------------------------------------------------------
+// Customers & orders
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id        String   @id @default(cuid())
+  storeId   String
+  email     String
+  firstName String
+  lastName  String
+  phone     String?
+  notes     String?
+  tags      String[] @default([])
+  isDemo    Boolean  @default(false)
+  acceptsMarketing Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store     Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  addresses Address[]
+  orders    Order[]
+  reviews   Review[]
+
+  @@unique([storeId, email])
+  @@index([storeId])
+}
+
+model Address {
+  id         String  @id @default(cuid())
+  customerId String
+  label      String  @default("shipping")
+  line1      String
+  line2      String?
+  city       String
+  region     String
+  postalCode String
+  country    String  @default("US")
+  isDefault  Boolean @default(false)
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+  PARTIALLY_REFUNDED
+  FAILED
+}
+
+enum FulfillmentStatus {
+  UNFULFILLED
+  PARTIALLY_FULFILLED
+  FULFILLED
+  CANCELLED
+}
+
+model Order {
+  id         String @id @default(cuid())
+  storeId    String
+  number     Int
+  customerId String?
+
+  email String
+
+  paymentStatus     PaymentStatus     @default(PENDING)
+  fulfillmentStatus FulfillmentStatus @default(UNFULFILLED)
+
+  subtotal       Decimal @db.Decimal(10, 2)
+  discountTotal  Decimal @default(0) @db.Decimal(10, 2)
+  shippingTotal  Decimal @default(0) @db.Decimal(10, 2)
+  taxTotal       Decimal @default(0) @db.Decimal(10, 2)
+  total          Decimal @db.Decimal(10, 2)
+  refundedTotal  Decimal @default(0) @db.Decimal(10, 2)
+  currency       String  @default("USD")
+
+  discountCode String?
+  trackingNumber String?
+  trackingCarrier String?
+  notes        String?
+  isDemo       Boolean @default(false)
+
+  // denormalised address snapshots
+  shippingAddress Json?
+  billingAddress  Json?
+
+  // attribution
+  source     String? // direct | google | instagram | tiktok | facebook | email | other
+  utmSource  String?
+  utmMedium  String?
+  utmCampaign String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store     Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer  Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  items     OrderItem[]
+  payments  Payment[]
+  events    OrderEvent[]
+  expEvents ExperimentEvent[]
+
+  @@unique([storeId, number])
+  @@index([storeId, createdAt])
+  @@index([customerId])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String?
+  variantId String?
+
+  title     String
+  variantTitle String?
+  sku       String?
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  total     Decimal @db.Decimal(10, 2)
+  imageUrl  String?
+
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Payment {
+  id       String        @id @default(cuid())
+  orderId  String
+  amount   Decimal       @db.Decimal(10, 2)
+  status   PaymentStatus @default(PENDING)
+  provider String        @default("simulated") // simulated | stripe
+  providerRef String?
+  createdAt DateTime     @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+model OrderEvent {
+  id        String   @id @default(cuid())
+  orderId   String
+  type      String // created | paid | fulfilled | cancelled | refunded | note | tracking
+  message   String
+  actor     String   @default("system") // system | user:<id> | ai
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Cart (storefront)
+// ---------------------------------------------------------------------------
+
+model Cart {
+  id        String   @id @default(cuid())
+  storeId   String
+  token     String   @unique
+  discountCode String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  items CartItem[]
+
+  @@index([storeId])
+}
+
+model CartItem {
+  id        String @id @default(cuid())
+  cartId    String
+  productId String
+  variantId String?
+  quantity  Int    @default(1)
+
+  cart    Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId, variantId])
+  @@index([cartId])
+}
+
+// ---------------------------------------------------------------------------
+// Discounts
+// ---------------------------------------------------------------------------
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  FREE_SHIPPING
+  BUY_X_GET_Y
+}
+
+enum DiscountStatus {
+  DRAFT
+  ACTIVE
+  SCHEDULED
+  EXPIRED
+  DISABLED
+}
+
+model Discount {
+  id      String         @id @default(cuid())
+  storeId String
+  code    String?
+  title   String
+  type    DiscountType   @default(PERCENTAGE)
+  status  DiscountStatus @default(DRAFT)
+  automatic Boolean      @default(false)
+
+  value Decimal @default(0) @db.Decimal(10, 2) // percent (0-100) or fixed amount
+
+  minPurchase  Decimal? @db.Decimal(10, 2)
+  minQuantity  Int?
+  usageLimit   Int?
+  usageCount   Int      @default(0)
+  oncePerCustomer Boolean @default(false)
+
+  // scoping: { scope: "all"|"products"|"collections", productIds: [], collectionIds: [] }
+  appliesTo Json @default("{\"scope\":\"all\"}")
+  // BUY_X_GET_Y config: { buyQuantity, getQuantity, getDiscountPercent }
+  bxgyConfig Json?
+
+  customerScope Json? // { scope: "all"|"segment"|"specific", customerIds: [] }
+
+  startsAt DateTime  @default(now())
+  endsAt   DateTime?
+  isDemo   Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, code])
+  @@index([storeId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Reviews
+// ---------------------------------------------------------------------------
+
+enum ReviewStatus {
+  PENDING
+  PUBLISHED
+  HIDDEN
+}
+
+model Review {
+  id         String       @id @default(cuid())
+  storeId    String
+  productId  String
+  customerId String?
+  authorName String
+  rating     Int
+  title      String?
+  body       String
+  verified   Boolean      @default(false)
+  status     ReviewStatus @default(PENDING)
+  isDemo     Boolean      @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store    Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product  Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([productId, status])
+  @@index([storeId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Analytics
+// ---------------------------------------------------------------------------
+
+model AnalyticsEvent {
+  id        String   @id @default(cuid())
+  storeId   String
+  type      String // page_view | product_view | collection_view | add_to_cart | remove_from_cart | checkout_started | purchase | email_signup
+  sessionId String
+  customerId String?
+  productId String?
+  collectionId String?
+  orderId   String?
+  path      String?
+  referrer  String?
+  source    String? // direct | google | instagram | tiktok | facebook | email | other
+  utmSource String?
+  utmMedium String?
+  utmCampaign String?
+  device    String? // desktop | mobile | tablet
+  value     Decimal? @db.Decimal(10, 2)
+  isDemo    Boolean  @default(false)
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, type, createdAt])
+  @@index([storeId, createdAt])
+  @@index([sessionId])
+}
+
+// Pre-aggregated daily rollup that powers dashboards fast.
+model AnalyticsDaily {
+  id      String   @id @default(cuid())
+  storeId String
+  date    DateTime @db.Date
+
+  visitors        Int     @default(0)
+  sessions        Int     @default(0)
+  pageViews       Int     @default(0)
+  productViews    Int     @default(0)
+  addToCarts      Int     @default(0)
+  checkoutsStarted Int    @default(0)
+  orders          Int     @default(0)
+  unitsSold       Int     @default(0)
+  grossSales      Decimal @default(0) @db.Decimal(12, 2)
+  discounts       Decimal @default(0) @db.Decimal(12, 2)
+  refunds         Decimal @default(0) @db.Decimal(12, 2)
+  netSales        Decimal @default(0) @db.Decimal(12, 2)
+  // { direct: n, google: n, ... }
+  sourceBreakdown Json    @default("{}")
+  deviceBreakdown Json    @default("{}")
+  isDemo          Boolean @default(false)
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, date])
+  @@index([storeId, date])
+}
+
+// ---------------------------------------------------------------------------
+// A/B testing
+// ---------------------------------------------------------------------------
+
+enum ExperimentStatus {
+  DRAFT
+  RUNNING
+  PAUSED
+  COMPLETED
+}
+
+model Experiment {
+  id      String           @id @default(cuid())
+  storeId String
+  name    String
+  hypothesis String?
+  status  ExperimentStatus @default(DRAFT)
+  // what is being tested
+  testType String // headline | hero | product_title | product_description | product_image | cta | price_display | section | page
+  // target
+  targetType String  @default("page") // page | product
+  pageId     String?
+  productId  String?
+  sectionId  String?
+  goal       String  @default("purchase") // purchase | add_to_cart | checkout_started | email_signup
+
+  startedAt DateTime?
+  endedAt   DateTime?
+  winnerVariantId String?
+  isDemo    Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store    Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  variants ExperimentVariant[]
+  events   ExperimentEvent[]
+
+  @@index([storeId, status])
+}
+
+model ExperimentVariant {
+  id           String  @id @default(cuid())
+  experimentId String
+  name         String // "A", "B", ...
+  isControl    Boolean @default(false)
+  weight       Int     @default(50) // traffic allocation percent
+  // patch applied to the target when this variant is served, e.g. { headline: "..." }
+  changes      Json    @default("{}")
+
+  createdAt DateTime @default(now())
+
+  experiment Experiment        @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  events     ExperimentEvent[]
+
+  @@index([experimentId])
+}
+
+model ExperimentEvent {
+  id           String   @id @default(cuid())
+  experimentId String
+  variantId    String
+  sessionId    String
+  type         String // impression | conversion
+  orderId      String?
+  value        Decimal? @db.Decimal(10, 2)
+  isDemo       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  experiment Experiment        @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  variant    ExperimentVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  order      Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([experimentId, type])
+  @@index([variantId, type])
+  @@unique([experimentId, sessionId, type])
+}
+
+// ---------------------------------------------------------------------------
+// Email marketing
+// ---------------------------------------------------------------------------
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  FAILED
+}
+
+model EmailCampaign {
+  id      String         @id @default(cuid())
+  storeId String
+  name    String
+  subject String
+  previewText String?
+  fromName  String?
+  fromEmail String?
+  audience  String       @default("all") // all | subscribers | customers | segment:<tag>
+  status    CampaignStatus @default(DRAFT)
+  // blocks: [{ type: heading|text|image|product|button|divider|spacer, ... }]
+  blocks    Json         @default("[]")
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  recipientCount Int     @default(0)
+  isDemo    Boolean      @default(false)
+
+  // demo metrics (seeded); real metrics require a configured provider
+  openRate  Decimal? @db.Decimal(5, 2)
+  clickRate Decimal? @db.Decimal(5, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, status])
+}
+
+model EmailSubscriber {
+  id        String   @id @default(cuid())
+  storeId   String
+  email     String
+  name      String?
+  status    String   @default("subscribed") // subscribed | unsubscribed
+  source    String   @default("storefront")
+  tags      String[] @default([])
+  isDemo    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, email])
+  @@index([storeId])
+}
+
+// ---------------------------------------------------------------------------
+// Integrations, media, AI, audit
+// ---------------------------------------------------------------------------
+
+enum IntegrationStatus {
+  NOT_CONFIGURED
+  CONNECTED
+  ERROR
+  DISCONNECTED
+}
+
+model Integration {
+  id       String            @id @default(cuid())
+  storeId  String
+  provider String // stripe | resend | google_analytics | ...
+  status   IntegrationStatus @default(NOT_CONFIGURED)
+  // never contains raw secrets in the client — server-only fields
+  config   Json              @default("{}")
+  // masked display value e.g. "sk_live_••••4242"
+  accountLabel String?
+  connectedAt  DateTime?
+  lastError    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, provider])
+  @@index([storeId])
+}
+
+model MediaAsset {
+  id       String   @id @default(cuid())
+  storeId  String
+  filename String
+  url      String
+  mimeType String
+  size     Int
+  width    Int?
+  height   Int?
+  alt      String?
+  isDemo   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, createdAt])
+}
+
+model AIConversation {
+  id      String  @id @default(cuid())
+  storeId String
+  userId  String
+  title   String  @default("New conversation")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store    Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AIMessage[]
+  actions  AIAction[]
+
+  @@index([storeId, userId, updatedAt])
+}
+
+model AIMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String // user | assistant
+  content        String
+  // structured tool traffic for replay/debug: [{ id, name, input, result }]
+  toolCalls      Json?
+  // pending confirmation payload when the assistant proposes a high-impact action
+  pendingAction  Json?
+  createdAt      DateTime @default(now())
+
+  conversation AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+enum AIActionStatus {
+  PENDING_CONFIRMATION
+  EXECUTED
+  FAILED
+  CANCELLED
+  UNDONE
+}
+
+model AIAction {
+  id             String         @id @default(cuid())
+  storeId        String
+  conversationId String?
+  userId         String?
+  prompt         String?
+  tool           String
+  params         Json
+  result         Json?
+  status         AIActionStatus @default(EXECUTED)
+  riskLevel      String         @default("read") // read | low | high
+  error          String?
+  // snapshot enabling undo for reversible operations
+  undoData       Json?
+  undoneAt       DateTime?
+  createdAt      DateTime       @default(now())
+
+  store        Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  conversation AIConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([storeId, createdAt])
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String?
+  actor          String   @default("user") // user | ai | system
+  action         String
+  entityType     String?
+  entityId       String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  storeId   String
+  userId    String?
+  type      String // new_order | low_inventory | experiment_completed | integration_error | ai_action_failed
+  title     String
+  body      String?
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, createdAt])
+}
