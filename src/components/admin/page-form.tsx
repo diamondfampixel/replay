@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ExternalLink, Trash2 } from "lucide-react";
+import { sanitizeHtml } from "@/lib/sanitize";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -146,7 +147,11 @@ export function PageForm({
                   <TabsContent value="preview">
                     <div
                       className="prose-halyard min-h-64 rounded-md border border-ink-200 p-4"
-                      dangerouslySetInnerHTML={{ __html: values.body }}
+                      // Previewing the draft through the same sanitiser the save
+                      // path uses: it keeps the preview honest about what will
+                      // actually be stored, and stops pasted markup from running
+                      // here in the admin.
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(values.body ?? "") }}
                     />
                   </TabsContent>
                 </Tabs>

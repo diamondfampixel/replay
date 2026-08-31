@@ -19,7 +19,52 @@ const ALLOWED_ATTRIBUTES: Record<string, Set<string>> = {
   img: new Set(["src", "alt", "width", "height"]),
 };
 
-const DANGEROUS_URL = /^\s*(javascript|data|vbscript):/i;
+/**
+ * Schemes a link or image may use. This is an allow-list rather than a list of
+ * blocked schemes: a browser understands more of them than any deny-list keeps
+ * up with, and an unknown scheme is not worth the risk.
+ */
+const ALLOWED_SCHEMES = new Set(["http", "https", "mailto", "tel"]);
+
+/** Strips the characters a browser ignores when it resolves a URL's scheme. */
+const IGNORED_IN_URL = new RegExp(
+  "[" + String.fromCharCode(0) + "-" + String.fromCharCode(32) + String.fromCharCode(127) + "]",
+  "g",
+);
+
+/**
+ * Resolves a URL the way the HTML parser will, then decides whether the scheme
+ * is allowed.
+ *
+ * Testing the raw attribute is not enough. The parser decodes entities and
+ * drops control characters before anything looks at the scheme, so
+ * `&#106;avascript:` and `jav&#9;ascript:` both reach the navigation layer as
+ * `javascript:` even though neither matches that string as written.
+ */
+function isSafeUrl(rawValue: string): boolean {
+  let value = rawValue;
+
+  // Decoding can expose another layer of encoding, so repeat to a fixed point.
+  for (let pass = 0; pass < 3; pass++) {
+    const decoded = value
+      .replace(/&#x([0-9a-f]+);?/gi, (_match, hex: string) =>
+        String.fromCharCode(parseInt(hex, 16)),
+      )
+      .replace(/&#(\d+);?/g, (_match, dec: string) => String.fromCharCode(parseInt(dec, 10)))
+      .replace(/&colon;?/gi, ":")
+      .replace(/&tab;?/gi, String.fromCharCode(9))
+      .replace(/&newline;?/gi, String.fromCharCode(10));
+    if (decoded === value) break;
+    value = decoded;
+  }
+
+  value = value.replace(IGNORED_IN_URL, "").trim();
+
+  // No scheme at all means a relative URL, which cannot execute.
+  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(value);
+  if (!scheme) return true;
+  return ALLOWED_SCHEMES.has(scheme[1].toLowerCase());
+}
 
 export function sanitizeHtml(input: string): string {
   if (!input) return "";
@@ -45,7 +90,7 @@ export function sanitizeHtml(input: string): string {
         const name = attribute[1].toLowerCase();
         const value = attribute[3] ?? attribute[4] ?? "";
         if (!allowed.has(name)) continue;
-        if ((name === "href" || name === "src") && DANGEROUS_URL.test(value)) continue;
+        if ((name === "href" || name === "src") && !isSafeUrl(value)) continue;
         attributes.push(`${name}="${value.replace(/"/g, "&quot;")}"`);
       }
 
