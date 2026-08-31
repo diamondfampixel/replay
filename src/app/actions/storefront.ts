@@ -25,6 +25,17 @@ async function storeBySlug(slug: string) {
   return store;
 }
 
+/**
+ * A paused store stays readable so shoppers see why, but it must not take
+ * money. The admin's pause control says "Store paused"; without this it only
+ * changed a badge while checkout carried on working.
+ */
+function assertAcceptingOrders(store: { status: string }) {
+  if (store.status !== "ACTIVE") {
+    throw new Error("This store is not accepting orders right now.");
+  }
+}
+
 /** Storefront actions run as the system, not as a signed-in admin. */
 function systemContext(store: { id: string; organizationId: string }): ServiceContext {
   return {
@@ -45,6 +56,7 @@ export async function addToCartAction(
 ) {
   return guard(async () => {
     const store = await storeBySlug(storeSlug);
+    assertAcceptingOrders(store);
     await addToCart(store.id, productId, variantId, quantity);
 
     if (sessionId) {
@@ -70,6 +82,7 @@ export async function addToCartAction(
 export async function updateCartItemAction(storeSlug: string, itemId: string, quantity: number) {
   return guard(async () => {
     const store = await storeBySlug(storeSlug);
+    assertAcceptingOrders(store);
     await updateCartItem(store.id, itemId, quantity);
     revalidatePath(`/s/${storeSlug}`, "layout");
     return ok(await getCartView(store.id));
@@ -158,6 +171,7 @@ export async function subscribeAction(storeSlug: string, formData: FormData, ses
 export async function checkoutAction(storeSlug: string, payload: unknown, sessionId?: string) {
   return guard(async () => {
     const store = await storeBySlug(storeSlug);
+    assertAcceptingOrders(store);
     const headerList = await headers();
     const ip = headerList.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
 

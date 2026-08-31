@@ -48,6 +48,15 @@ export default async function StorefrontLayout({
         <StorefrontAnalytics storeSlug={storeSlug} sessionId={sessionId}>
           <CartProvider storeSlug={storeSlug} initialCart={cart}>
             <StorefrontHeader store={store} />
+            {store.status !== "ACTIVE" && (
+              <div
+                role="status"
+                className="border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-center text-[13px] text-amber-900"
+              >
+                {store.name} is not accepting orders at the moment. You can still browse —
+                checkout will reopen when the store does.
+              </div>
+            )}
             <main className="flex-1">{children}</main>
             <StorefrontFooter store={store} />
           </CartProvider>

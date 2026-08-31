@@ -296,3 +296,67 @@ describe("orders", () => {
     await cleanupTestStore(other.organization.id, other.user.id);
   });
 });
+
+describe("a paused store stops taking orders", () => {
+  /**
+   * The admin's pause control reports "Store paused". These pin that it means
+   * something on the storefront rather than only changing a badge.
+   */
+  async function setStatus(status: "ACTIVE" | "PAUSED" | "DRAFT") {
+    await testDb.store.update({ where: { id: ctx.storeId }, data: { status } });
+  }
+
+  const slug = async () =>
+    (await testDb.store.findUniqueOrThrow({ where: { id: ctx.storeId } })).slug;
+
+  afterAll(async () => {
+    await setStatus("ACTIVE");
+  });
+
+  it("refuses add to cart, quantity changes and checkout while paused", async () => {
+    const { addToCartAction, updateCartItemAction, checkoutAction } = await import(
+      "@/app/actions/storefront"
+    );
+    const storeSlug = await slug();
+
+    await setStatus("ACTIVE");
+    const added = await addToCartAction(storeSlug, cheapProductId, null, 1);
+    expect(added.ok).toBe(true);
+    const itemId = (await getCartView(ctx.storeId)).items[0].id;
+
+    await setStatus("PAUSED");
+
+    expect((await addToCartAction(storeSlug, cheapProductId, null, 1)).ok).toBe(false);
+    expect((await updateCartItemAction(storeSlug, itemId, 5)).ok).toBe(false);
+
+    const checkout = await checkoutAction(storeSlug, {
+      email: "shopper@example.test",
+      acceptsMarketing: false,
+      shippingAddress: {
+        name: "Paused Shopper",
+        line1: "1 Test Street",
+        city: "Testville",
+        postalCode: "12345",
+        country: "US",
+      },
+    });
+    expect(checkout.ok).toBe(false);
+
+    // Nothing was written.
+    const orders = await testDb.order.count({
+      where: { storeId: ctx.storeId, email: "shopper@example.test" },
+    });
+    expect(orders).toBe(0);
+  });
+
+  it("lets the same calls through once the store is active again", async () => {
+    const { addToCartAction } = await import("@/app/actions/storefront");
+    const storeSlug = await slug();
+
+    await setStatus("PAUSED");
+    expect((await addToCartAction(storeSlug, cheapProductId, null, 1)).ok).toBe(false);
+
+    await setStatus("ACTIVE");
+    expect((await addToCartAction(storeSlug, cheapProductId, null, 1)).ok).toBe(true);
+  });
+});
