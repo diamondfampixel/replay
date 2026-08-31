@@ -7,8 +7,9 @@ import {
 } from "@/lib/services/context";
 import {
   productInputSchema, productListParamsSchema,
-  type ProductInput, type ProductListParams,
+  type ProductListParams,
 } from "@/lib/validation/catalog";
+import { parseProvided } from "@/lib/validation/partial";
 
 export type ProductRow = {
   id: string;
@@ -254,7 +255,7 @@ export async function updateProduct(ctx: ServiceContext, id: string, raw: unknow
   });
   if (!existing) throw new NotFoundError("Product");
 
-  const input = productInputSchema.partial().parse(raw);
+  const input = parseProvided(productInputSchema, raw);
 
   const slug =
     input.slug !== undefined || input.title !== undefined

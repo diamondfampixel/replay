@@ -3,6 +3,7 @@ import { prisma, type Prisma } from "@/lib/db";
 import { round2, toNumber } from "@/lib/money";
 import { audit, authorize, NotFoundError, ValidationError, type ServiceContext } from "@/lib/services/context";
 import { customerInputSchema, customerListParamsSchema, addressSchema } from "@/lib/validation/commerce";
+import { parseProvided } from "@/lib/validation/partial";
 
 export async function listCustomers(ctx: ServiceContext, rawParams: Record<string, unknown> = {}) {
   authorize(ctx, "customers:read");
@@ -139,7 +140,7 @@ export async function updateCustomer(ctx: ServiceContext, id: string, raw: unkno
   const existing = await prisma.customer.findFirst({ where: { id, storeId: ctx.storeId } });
   if (!existing) throw new NotFoundError("Customer");
 
-  const input = customerInputSchema.partial().parse(raw);
+  const input = parseProvided(customerInputSchema, raw);
   const customer = await prisma.customer.update({ where: { id }, data: input });
   await audit(ctx, "customer.update", { type: "Customer", id });
   return customer;

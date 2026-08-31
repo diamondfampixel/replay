@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/utils";
 import { audit, authorize, NotFoundError, uniqueStoreSlug, ValidationError, type ServiceContext } from "@/lib/services/context";
 import { categoryInputSchema } from "@/lib/validation/catalog";
+import { parseProvided } from "@/lib/validation/partial";
 
 export type CategoryNode = {
   id: string;
@@ -80,7 +81,7 @@ export async function updateCategory(ctx: ServiceContext, id: string, raw: unkno
   const existing = await prisma.category.findFirst({ where: { id, storeId: ctx.storeId } });
   if (!existing) throw new NotFoundError("Category");
 
-  const input = categoryInputSchema.partial().parse(raw);
+  const input = parseProvided(categoryInputSchema, raw);
   if (input.parentId === id) throw new ValidationError("A category cannot be its own parent.");
 
   // Prevent creating a cycle by walking up from the proposed parent.

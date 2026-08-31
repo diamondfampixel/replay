@@ -4,6 +4,7 @@ import { slugify } from "@/lib/utils";
 import { toNumber } from "@/lib/money";
 import { audit, authorize, NotFoundError, uniqueStoreSlug, type ServiceContext } from "@/lib/services/context";
 import { collectionInputSchema } from "@/lib/validation/catalog";
+import { parseProvided } from "@/lib/validation/partial";
 
 export type CollectionRule = {
   field: "tag" | "price" | "category" | "vendor" | "inventory" | "title";
@@ -201,7 +202,7 @@ export async function updateCollection(ctx: ServiceContext, id: string, raw: unk
   const existing = await prisma.collection.findFirst({ where: { id, storeId: ctx.storeId } });
   if (!existing) throw new NotFoundError("Collection");
 
-  const input = collectionInputSchema.partial().parse(raw);
+  const input = parseProvided(collectionInputSchema, raw);
   const slug =
     input.slug !== undefined || input.title !== undefined
       ? await uniqueStoreSlug("collection", ctx.storeId, input.slug || slugify(input.title ?? existing.title), id)
