@@ -1,8 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800" role="img" aria-label="Archive Sweatshirt">
   <rect width="800" height="800" fill="#f0ece7"/>
-  <rect x="250" y="300" width="300" height="90" rx="14" fill="#d8cfc2"/>
-              <rect x="280" y="410" width="240" height="90" rx="14" fill="#d8cfc2" opacity="0.75"/>
-              <rect x="310" y="520" width="180" height="90" rx="14" fill="#a1660a" opacity="0.22"/>
+  <path d="M250 300 L340 250 L400 285 L460 250 L550 300 L520 380 L470 355 L470 640 L330 640 L330 355 L280 380 Z" fill="#d8cfc2"/>
+              <path d="M330 545 L470 545 L470 640 L330 640 Z" fill="#a1660a" opacity="0.18"/>
   <rect x="0" y="712" width="800" height="88" fill="#f0ece7"/>
   <text x="400" y="756" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="24" letter-spacing="4" fill="#443c30">ARCHIVE SWEATSHIRT</text>
   <rect x="0" y="0" width="800" height="800" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="2"/>

@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800" role="img" aria-label="Daily Pocket Tee">
   <rect width="800" height="800" fill="#e9ece6"/>
-  <path d="M250 620 L400 240 L550 620 Z" fill="#ccd3c2"/>
-              <path d="M330 620 L400 430 L470 620 Z" fill="#4b7a2a" opacity="0.2"/>
+  <path d="M250 300 L340 250 L400 285 L460 250 L550 300 L520 380 L470 355 L470 640 L330 640 L330 355 L280 380 Z" fill="#ccd3c2"/>
+              <path d="M330 545 L470 545 L470 640 L330 640 Z" fill="#4b7a2a" opacity="0.18"/>
   <rect x="0" y="712" width="800" height="88" fill="#e9ece6"/>
   <text x="400" y="756" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="24" letter-spacing="4" fill="#3a4033">DAILY POCKET TEE</text>
   <rect x="0" y="0" width="800" height="800" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="2"/>

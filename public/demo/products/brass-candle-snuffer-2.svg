@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800" role="img" aria-label="Brass Candle Snuffer">
   <rect width="800" height="800" fill="#e8eaef"/>
-  <rect x="250" y="300" width="300" height="90" rx="14" fill="#c8cdd9"/>
-              <rect x="280" y="410" width="240" height="90" rx="14" fill="#c8cdd9" opacity="0.75"/>
-              <rect x="310" y="520" width="180" height="90" rx="14" fill="#2b5f9e" opacity="0.22"/>
+  <rect x="330" y="240" width="140" height="400" rx="16" fill="#c8cdd9"/>
+              <rect x="330" y="500" width="140" height="140" fill="#2b5f9e" opacity="0.22"/>
+              <rect x="368" y="200" width="64" height="44" rx="10" fill="#c8cdd9" opacity="0.7"/>
   <rect x="0" y="712" width="800" height="88" fill="#e8eaef"/>
   <text x="400" y="756" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="24" letter-spacing="4" fill="#343846">BRASS CANDLE SNUFFER</text>
   <rect x="0" y="0" width="800" height="800" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="2"/>

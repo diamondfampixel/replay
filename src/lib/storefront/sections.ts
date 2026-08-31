@@ -181,14 +181,39 @@ export function isSectionType(value: string): value is SectionType {
   return (SECTION_TYPES as readonly string[]).includes(value);
 }
 
-/** Validates and fills defaults. Unknown keys are dropped rather than stored. */
+/**
+ * Validates and fills defaults. Unknown keys are dropped rather than stored.
+ *
+ * A single bad field must not discard the whole section — losing an entire
+ * benefits list because its heading was null is worse than dropping the
+ * heading. Nulls are treated as "not set" so the schema default applies, and
+ * anything still invalid is removed key by key before a final parse.
+ */
 export function normaliseSectionConfig(type: string, config: unknown): Record<string, unknown> {
   if (!isSectionType(type)) return {};
   const schema = sectionSchemas[type];
-  const result = schema.safeParse(config ?? {});
+  const input = stripNullish(config);
+
+  const result = schema.safeParse(input);
   if (result.success) return result.data as Record<string, unknown>;
-  // Fall back to defaults so a malformed config never breaks the storefront.
-  return schema.parse({}) as Record<string, unknown>;
+
+  const invalidKeys = new Set(result.error.issues.map((issue) => String(issue.path[0])));
+  const filtered = Object.fromEntries(
+    Object.entries(input).filter(([key]) => !invalidKeys.has(key)),
+  );
+
+  const retry = schema.safeParse(filtered);
+  return (retry.success ? retry.data : schema.parse({})) as Record<string, unknown>;
+}
+
+/** Drops null and undefined so schema defaults apply instead of failing. */
+function stripNullish(config: unknown): Record<string, unknown> {
+  if (!config || typeof config !== "object") return {};
+  return Object.fromEntries(
+    Object.entries(config as Record<string, unknown>).filter(
+      ([, value]) => value !== null && value !== undefined,
+    ),
+  );
 }
 
 export function defaultSectionConfig(type: SectionType): Record<string, unknown> {

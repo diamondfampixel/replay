@@ -9,6 +9,7 @@ import { formatMoney } from "@/lib/money";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { ProductCardData } from "@/lib/storefront/data";
+import { deriveOptionAxes } from "@/lib/variant-options";
 
 type Variant = {
   id: string;
@@ -56,18 +57,7 @@ export function ProductDetail({
   const [adding, setAdding] = React.useState(false);
   const [added, setAdded] = React.useState(false);
 
-  // Option axes reconstructed from the variant option maps.
-  const axes = React.useMemo(() => {
-    const map = new Map<string, string[]>();
-    for (const variant of product.variants) {
-      for (const [name, value] of Object.entries(variant.options)) {
-        const values = map.get(name) ?? [];
-        if (!values.includes(value)) values.push(value);
-        map.set(name, values);
-      }
-    }
-    return [...map.entries()].map(([name, values]) => ({ name, values }));
-  }, [product.variants]);
+  const axes = React.useMemo(() => deriveOptionAxes(product.variants), [product.variants]);
 
   const [selection, setSelection] = React.useState<Record<string, string>>(() => {
     const firstAvailable = product.variants.find((variant) => variant.inventory > 0) ?? product.variants[0];

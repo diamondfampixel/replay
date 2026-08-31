@@ -158,3 +158,52 @@ describe("organization isolation", () => {
     await cleanupTestStore(other.organization.id, other.user.id);
   });
 });
+
+describe("variant option ordering", () => {
+  it("restores the operator's axis order despite jsonb key reordering", async () => {
+    const { deriveOptionAxes } = await import("@/lib/variant-options");
+
+    // Postgres jsonb sorts keys by length then alphabetically, so a round trip
+    // turns { Color, Size } into { Size, Color }.
+    const variants = [
+      { title: "Black / Small", options: { Size: "Small", Color: "Black" } },
+      { title: "Black / Medium", options: { Size: "Medium", Color: "Black" } },
+      { title: "Bone / Small", options: { Size: "Small", Color: "Bone" } },
+    ];
+
+    const axes = deriveOptionAxes(variants);
+    expect(axes.map((axis) => axis.name)).toEqual(["Color", "Size"]);
+    expect(axes[0].values).toEqual(["Black", "Bone"]);
+    expect(axes[1].values).toEqual(["Small", "Medium"]);
+  });
+
+  it("handles a single axis and no variants", async () => {
+    const { deriveOptionAxes } = await import("@/lib/variant-options");
+    expect(deriveOptionAxes([])).toEqual([]);
+    expect(
+      deriveOptionAxes([{ title: "Small", options: { Size: "Small" } }]),
+    ).toEqual([{ name: "Size", values: ["Small"] }]);
+  });
+
+  it("survives a round trip through the database", async () => {
+    const { deriveOptionAxes } = await import("@/lib/variant-options");
+    const product = await createProduct(ctx, {
+      title: "Axis Order Product",
+      price: 50,
+      variants: [
+        { title: "x", options: { Color: "Black", Size: "S" }, inventory: 1 },
+        { title: "x", options: { Color: "Black", Size: "M" }, inventory: 1 },
+        { title: "x", options: { Color: "Bone", Size: "S" }, inventory: 1 },
+      ],
+    });
+
+    const stored = await getProduct(ctx, product.id);
+    const axes = deriveOptionAxes(
+      stored.variants.map((variant) => ({
+        title: variant.title,
+        options: variant.options as Record<string, string>,
+      })),
+    );
+    expect(axes.map((axis) => axis.name)).toEqual(["Color", "Size"]);
+  });
+});

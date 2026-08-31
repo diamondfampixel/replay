@@ -171,3 +171,44 @@ describe("content pages", () => {
     expect(hidden.published).toBe(false);
   });
 });
+
+describe("section config validation", () => {
+  it("keeps valid fields when one field is malformed", async () => {
+    const { normaliseSectionConfig } = await import("@/lib/storefront/sections");
+
+    const config = normaliseSectionConfig("benefits", {
+      // A null heading used to make the whole section fall back to defaults,
+      // silently dropping the items with it.
+      heading: null,
+      items: [
+        { title: "Made in small batches", body: "Short runs with mills we know." },
+        { title: "Free returns", body: "Sixty days, no forms." },
+      ],
+    });
+
+    expect(config.items).toHaveLength(2);
+    expect((config.items as Array<{ title: string }>)[0].title).toBe("Made in small batches");
+    expect(config.heading).toBe("");
+  });
+
+  it("drops only the invalid key, not the section", async () => {
+    const { normaliseSectionConfig } = await import("@/lib/storefront/sections");
+
+    const config = normaliseSectionConfig("hero", {
+      headline: "A real headline",
+      // Not a valid enum member.
+      height: "enormous",
+      ctaLabel: "Shop",
+    });
+
+    expect(config.headline).toBe("A real headline");
+    expect(config.ctaLabel).toBe("Shop");
+    expect(config.height).toBe("large"); // schema default
+  });
+
+  it("still falls back entirely when nothing is salvageable", async () => {
+    const { normaliseSectionConfig } = await import("@/lib/storefront/sections");
+    const config = normaliseSectionConfig("hero", "not an object");
+    expect(config.headline).toBeTruthy();
+  });
+});

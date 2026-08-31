@@ -60,8 +60,10 @@ export function Topbar({
       </button>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-medium text-ink-800">{organizationName}</p>
-        <p className="truncate text-[11.5px] text-ink-500">{storeName}</p>
+        <p className="truncate text-[13px] font-medium text-ink-800">{storeName}</p>
+        {organizationName !== storeName && (
+          <p className="truncate text-[11.5px] text-ink-500">{organizationName}</p>
+        )}
       </div>
 
       <Button

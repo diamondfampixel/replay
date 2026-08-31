@@ -35,38 +35,65 @@ function escapeXml(value: string) {
     .replace(/'/g, "&apos;");
 }
 
-type ShapeKind = "column" | "arc" | "stack" | "grid" | "wedge";
-const SHAPES: ShapeKind[] = ["column", "arc", "stack", "grid", "wedge"];
+type ShapeKind = "garment" | "vessel" | "folded" | "carry" | "column";
+const SHAPES: ShapeKind[] = ["garment", "vessel", "folded", "carry", "column"];
 
+/**
+ * Abstract product forms rather than figurative shapes — a placeholder should
+ * read as "photography goes here", not as an avatar.
+ */
 function shapeMarkup(kind: ShapeKind, shape: string, accent: string): string {
   switch (kind) {
+    // Shoulders and a body: reads as folded apparel.
+    case "garment":
+      return `<path d="M250 300 L340 250 L400 285 L460 250 L550 300 L520 380 L470 355 L470 640 L330 640 L330 355 L280 380 Z" fill="${shape}"/>
+              <path d="M330 545 L470 545 L470 640 L330 640 Z" fill="${accent}" opacity="0.18"/>`;
+    // A bottle or jar profile.
+    case "vessel":
+      return `<path d="M370 230 h60 v60 q70 40 70 130 v190 q0 40 -40 40 h-120 q-40 0 -40 -40 v-190 q0 -90 70 -130 z" fill="${shape}"/>
+              <rect x="300" y="470" width="200" height="110" fill="${accent}" opacity="0.2"/>`;
+    // Neatly stacked textiles.
+    case "folded":
+      return `<rect x="250" y="330" width="300" height="80" rx="8" fill="${shape}"/>
+              <rect x="250" y="424" width="300" height="80" rx="8" fill="${shape}" opacity="0.78"/>
+              <rect x="250" y="518" width="300" height="80" rx="8" fill="${accent}" opacity="0.24"/>`;
+    // A bag with a handle.
+    case "carry":
+      return `<path d="M330 320 q70 -110 140 0" fill="none" stroke="${shape}" stroke-width="20" stroke-linecap="round"/>
+              <rect x="270" y="320" width="260" height="300" rx="14" fill="${shape}"/>
+              <rect x="270" y="530" width="260" height="90" rx="0" fill="${accent}" opacity="0.2"/>`;
+    // A tall taper — candles, lighting, drinkware.
     case "column":
-      return `<rect x="300" y="200" width="200" height="440" rx="100" fill="${shape}"/>
-              <rect x="300" y="470" width="200" height="170" fill="${accent}" opacity="0.16"/>`;
-    case "arc":
-      return `<path d="M240 620 A160 160 0 0 1 560 620 Z" fill="${shape}"/>
-              <circle cx="400" cy="340" r="96" fill="${accent}" opacity="0.18"/>`;
-    case "stack":
-      return `<rect x="250" y="300" width="300" height="90" rx="14" fill="${shape}"/>
-              <rect x="280" y="410" width="240" height="90" rx="14" fill="${shape}" opacity="0.75"/>
-              <rect x="310" y="520" width="180" height="90" rx="14" fill="${accent}" opacity="0.22"/>`;
-    case "grid":
-      return `<rect x="260" y="260" width="130" height="130" rx="12" fill="${shape}"/>
-              <rect x="410" y="260" width="130" height="130" rx="12" fill="${shape}" opacity="0.7"/>
-              <rect x="260" y="410" width="130" height="130" rx="12" fill="${shape}" opacity="0.7"/>
-              <rect x="410" y="410" width="130" height="130" rx="12" fill="${accent}" opacity="0.24"/>`;
-    case "wedge":
     default:
-      return `<path d="M250 620 L400 240 L550 620 Z" fill="${shape}"/>
-              <path d="M330 620 L400 430 L470 620 Z" fill="${accent}" opacity="0.2"/>`;
+      return `<rect x="330" y="240" width="140" height="400" rx="16" fill="${shape}"/>
+              <rect x="330" y="500" width="140" height="140" fill="${accent}" opacity="0.22"/>
+              <rect x="368" y="200" width="64" height="44" rx="10" fill="${shape}" opacity="0.7"/>`;
   }
 }
 
-/** Renders a square SVG studio card. Same input always yields the same file. */
-export function productPlaceholderSvg(label: string, variantKey = ""): string {
+/** Maps a product category onto the closest abstract form. */
+const CATEGORY_SHAPES: Record<string, ShapeKind> = {
+  hoodies: "garment",
+  "t-shirts": "garment",
+  outerwear: "garment",
+  apparel: "garment",
+  bags: "carry",
+  accessories: "carry",
+  headwear: "folded",
+  home: "folded",
+  drinkware: "vessel",
+  lighting: "column",
+};
+
+/**
+ * Renders a square SVG studio card. Same input always yields the same file, and
+ * the form follows the product's category so a bag does not look like a shirt.
+ */
+export function productPlaceholderSvg(label: string, variantKey = "", category?: string): string {
   const seed = hash(`${label}::${variantKey}`);
   const palette = PALETTES[seed % PALETTES.length];
-  const kind = SHAPES[(seed >>> 3) % SHAPES.length];
+  const kind: ShapeKind =
+    (category ? CATEGORY_SHAPES[category] : undefined) ?? SHAPES[(seed >>> 3) % SHAPES.length];
   const caption = escapeXml(label.toUpperCase().slice(0, 28));
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800" role="img" aria-label="${escapeXml(label)}">
@@ -78,17 +105,18 @@ export function productPlaceholderSvg(label: string, variantKey = ""): string {
 </svg>`;
 }
 
-/** Wide banner artwork used by storefront hero / image-text sections. */
+/**
+ * Wide banner artwork for hero and image-text sections. Kept to soft overlapping
+ * fields so overlaid copy stays readable at any crop.
+ */
 export function bannerPlaceholderSvg(label: string, primary = "#0e7c66"): string {
   const seed = hash(label);
   const palette = PALETTES[seed % PALETTES.length];
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="img" aria-label="${escapeXml(label)}">
   <rect width="1600" height="900" fill="${palette.bg}"/>
-  <circle cx="1180" cy="330" r="300" fill="${palette.shape}"/>
-  <circle cx="1180" cy="330" r="150" fill="${primary}" opacity="0.18"/>
-  <rect x="0" y="640" width="1600" height="260" fill="${palette.shape}" opacity="0.5"/>
-  <rect x="120" y="700" width="420" height="14" rx="7" fill="${palette.text}" opacity="0.25"/>
-  <rect x="120" y="736" width="280" height="14" rx="7" fill="${palette.text}" opacity="0.15"/>
+  <circle cx="1240" cy="450" r="360" fill="${palette.shape}" opacity="0.85"/>
+  <circle cx="1120" cy="330" r="170" fill="${primary}" opacity="0.14"/>
+  <path d="M900 900 Q1200 620 1600 760 L1600 900 Z" fill="${palette.shape}" opacity="0.45"/>
 </svg>`;
 }
 

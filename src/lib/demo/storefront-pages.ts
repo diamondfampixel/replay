@@ -41,7 +41,7 @@ export function defaultHomepageSections(store: {
     {
       type: "benefits",
       config: {
-        heading: null,
+        heading: "",
         items: [
           { title: "Made in small batches", body: "Short runs with mills we have worked with for years." },
           { title: "Free returns for 60 days", body: "If it does not fit, send it back. No forms." },

@@ -1,9 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { cleanupTestStore, createTestStore, testDb } from "./helpers";
 import { clearTestCookies } from "./setup";
-import { createProduct } from "@/lib/services/products";
 import { createCollection } from "@/lib/services/collections";
-import { createDiscount } from "@/lib/services/discounts";
 import { createExperiment, recordExperimentEvent, setExperimentStatus, getExperimentResults } from "@/lib/services/experiments";
 import { ensureHomepage } from "@/lib/services/provision";
 import { getProductCards, getStore } from "@/lib/storefront/data";

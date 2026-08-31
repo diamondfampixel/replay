@@ -8,6 +8,7 @@ import { NotFoundError } from "@/lib/services/context";
 import { can } from "@/lib/permissions";
 import { toNumber } from "@/lib/money";
 import { ProductForm, type ProductFormValues } from "@/components/admin/product-form";
+import { deriveOptionAxes } from "@/lib/variant-options";
 
 export const metadata: Metadata = { title: "Product" };
 export const dynamic = "force-dynamic";
@@ -36,16 +37,13 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     getProductStats(ctx.storeId, id),
   ]);
 
-  // Reconstruct the option axes from the stored variant option maps so the
-  // matrix editor opens in the same state it was saved in.
-  const axisMap = new Map<string, string[]>();
-  for (const variant of product.variants) {
-    for (const [name, value] of Object.entries((variant.options ?? {}) as Record<string, string>)) {
-      const values = axisMap.get(name) ?? [];
-      if (!values.includes(value)) values.push(value);
-      axisMap.set(name, values);
-    }
-  }
+  // The matrix editor opens in the state it was saved in, option order included.
+  const optionAxes = deriveOptionAxes(
+    product.variants.map((variant) => ({
+      title: variant.title,
+      options: (variant.options ?? {}) as Record<string, string>,
+    })),
+  );
 
   const initial: ProductFormValues = {
     title: product.title,
@@ -75,7 +73,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       inventory: String(variant.inventory),
       imageUrl: variant.imageUrl,
     })),
-    optionAxes: [...axisMap.entries()].map(([name, values]) => ({ name, values })),
+    optionAxes,
   };
 
   return (

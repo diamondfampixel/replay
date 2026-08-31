@@ -141,12 +141,12 @@ export async function seedDemoStore(
     const imageUrl = await writeImage(
       options.publicDir,
       path.join("demo", "products", `${slug}.svg`),
-      productPlaceholderSvg(def.title),
+      productPlaceholderSvg(def.title, "", def.category),
     );
     const altUrl = await writeImage(
       options.publicDir,
       path.join("demo", "products", `${slug}-2.svg`),
-      productPlaceholderSvg(def.title, "alt"),
+      productPlaceholderSvg(def.title, "alt", def.category),
     );
 
     // Build the variant matrix from the option axes.
@@ -258,17 +258,24 @@ export async function seedDemoStore(
   }
 
   // -- customers -----------------------------------------------------------
+  // Customers are created as orders arrive rather than up front, so the ratio
+  // of new to repeat buyers — and therefore lifetime value — stays plausible.
   log("customers");
-  const customers: Array<{ id: string; email: string; name: string; createdAt: Date }> = [];
-  for (let i = 0; i < 68; i++) {
+  type SeededCustomer = { id: string; email: string; name: string; createdAt: Date };
+  const customers: SeededCustomer[] = [];
+  let customerCounter = 0;
+
+  async function createCustomer(createdAt: Date): Promise<SeededCustomer> {
     const first = pick(rng, DEMO_FIRST_NAMES);
     const last = pick(rng, DEMO_LAST_NAMES);
-    const email = `${first}.${last}${i}`.toLowerCase().replace(/[^a-z0-9.]/g, "") + "@example.test";
+    customerCounter += 1;
+    const email = `${first}.${last}${customerCounter}`
+      .toLowerCase()
+      .replace(/[^a-z0-9.]/g, "") + "@example.test";
     const [city, region, postal] = pick(rng, DEMO_CITIES);
-    const createdAt = daysAgo(intBetween(rng, 5, DAYS));
     const tags: string[] = [];
-    if (rng() < 0.18) tags.push("vip");
-    if (rng() < 0.25) tags.push("wholesale-interest");
+    if (rng() < 0.08) tags.push("vip");
+    if (rng() < 0.05) tags.push("wholesale-interest");
 
     const customer = await prisma.customer.create({
       data: {
@@ -297,7 +304,10 @@ export async function seedDemoStore(
         },
       },
     });
-    customers.push({ id: customer.id, email, name: `${first} ${last}`, createdAt });
+
+    const seeded = { id: customer.id, email, name: `${first} ${last}`, createdAt };
+    customers.push(seeded);
+    return seeded;
   }
 
   // -- discounts -----------------------------------------------------------
@@ -425,8 +435,15 @@ export async function seedDemoStore(
       const tax = round2((subtotal - discountAmount) * 0.0725);
       const total = round2(subtotal - discountAmount + shipping + tax);
 
-      // Most orders belong to a known customer; some are guest checkouts.
-      const customer = rng() < 0.88 ? pick(rng, customers.filter((c) => c.createdAt <= createdAt)) ?? pick(rng, customers) : null;
+      // Roughly a third of orders come from someone who has bought before,
+      // which is a realistic repeat rate for a brand of this size.
+      const returning = customers.length > 20 && rng() < 0.34;
+      const customer =
+        rng() < 0.9
+          ? returning
+            ? pick(rng, customers)
+            : await createCustomer(createdAt)
+          : null;
       const source = weightedPick(rng, SOURCE_WEIGHTS) as TrafficSource;
 
       const refunded = rng() < 0.05;
@@ -549,6 +566,7 @@ export async function seedDemoStore(
   // -- reviews -------------------------------------------------------------
   log("reviews");
   const reviewRows: Prisma.ReviewCreateManyInput[] = [];
+  if (!customers.length) await createCustomer(daysAgo(DAYS));
   for (const product of sellable) {
     const count = Math.max(1, Math.round(product.weight * 1.4));
     for (let i = 0; i < count; i++) {
@@ -800,7 +818,7 @@ export async function seedDemoStore(
   // -- email ---------------------------------------------------------------
   log("email");
   const subscriberRows: Prisma.EmailSubscriberCreateManyInput[] = customers
-    .filter(() => rng() < 0.75)
+    .filter(() => rng() < 0.5)
     .map((c) => ({
       storeId, email: c.email, name: c.name, status: "subscribed",
       source: "storefront", isDemo: true, createdAt: c.createdAt,

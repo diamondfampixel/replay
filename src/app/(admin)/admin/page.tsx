@@ -92,12 +92,6 @@ export default async function OverviewPage({
                 View store
               </a>
             </Button>
-            <Button asChild size="sm" variant="primary">
-              <Link href="/admin/assistant">
-                <Sparkles />
-                Ask AI
-              </Link>
-            </Button>
           </>
         }
       />
