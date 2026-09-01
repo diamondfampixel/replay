@@ -1,4 +1,5 @@
 import "server-only";
+import { assertCanSendCampaigns } from "@/lib/services/billing";
 import { prisma, type Prisma } from "@/lib/db";
 import { sanitizeHtml } from "@/lib/sanitize";
 import { audit, authorize, NotFoundError, ValidationError, type ServiceContext } from "@/lib/services/context";
@@ -256,6 +257,7 @@ export async function getEmailProvider(storeId: string): Promise<EmailProvider> 
  */
 export async function sendCampaign(ctx: ServiceContext, id: string) {
   authorize(ctx, "marketing:write");
+  await assertCanSendCampaigns(ctx);
   const campaign = await getCampaign(ctx, id);
   if (campaign.status === "SENT") throw new ValidationError("This campaign has already been sent.");
 

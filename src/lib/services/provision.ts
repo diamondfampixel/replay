@@ -48,7 +48,7 @@ export async function provisionOrganization(db: PrismaClient, input: ProvisionIn
     data: {
       name: input.businessName,
       slug: orgSlug,
-      plan: input.isDemo ? "demo" : "starter",
+      plan: input.isDemo ? "flagship" : "harbor",
       isDemo: input.isDemo ?? false,
       memberships: { create: { userId: input.userId, role: "OWNER" } },
     },

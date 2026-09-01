@@ -1,4 +1,5 @@
 import "server-only";
+import { assertCanStartExperiment } from "@/lib/services/billing";
 import { prisma, type Prisma, type ExperimentStatus } from "@/lib/db";
 import { hashString } from "@/lib/utils";
 import { round2, toNumber } from "@/lib/money";
@@ -483,6 +484,9 @@ export async function setExperimentStatus(ctx: ServiceContext, id: string, statu
 
   if (status === "RUNNING" && experiment.variants.length < 2) {
     throw new ValidationError("Add at least two variants before starting.");
+  }
+  if (status === "RUNNING" && experiment.status !== "RUNNING") {
+    await assertCanStartExperiment(ctx);
   }
 
   const updated = await prisma.experiment.update({

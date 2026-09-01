@@ -37,7 +37,10 @@ const GROUPS: Array<{
   },
   {
     label: "Account",
-    items: [{ href: "/admin/settings/profile", label: "Your profile" }],
+    items: [
+      { href: "/admin/settings/billing", label: "Plan & billing", capability: "billing:manage" },
+      { href: "/admin/settings/profile", label: "Your profile" },
+    ],
   },
 ];
 

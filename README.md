@@ -182,7 +182,7 @@ says it is not configured rather than pretending.
 | `AUTH_SECRET` | **yes** | Signs session and reset tokens. `openssl rand -base64 32` |
 | `NEXT_PUBLIC_APP_URL` | no | Public base URL |
 | `ANTHROPIC_API_KEY` | no | Enables the assistant, store builder and variant generation |
-| `ANTHROPIC_MODEL` | no | Defaults to `claude-opus-5` |
+| `ANTHROPIC_MODEL` | no | Defaults to `claude-sonnet-5` |
 | `STRIPE_SECRET_KEY` | no | Live payments (see below) |
 | `STRIPE_WEBHOOK_SECRET` | no | Stripe webhook signature verification |
 | `RESEND_API_KEY` | no | Real campaign sending |

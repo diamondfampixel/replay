@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import type Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/db";
-import { apiContext } from "@/lib/services/context";
+import { apiContext, ValidationError } from "@/lib/services/context";
+import { assertAIWithinBudget, recordAIUsage } from "@/lib/services/billing";
 import { getAIConfig } from "@/lib/ai/config";
 import { createAnthropic, extractJson } from "@/lib/ai/client";
 import { buildStoreContext } from "@/lib/ai/context";
@@ -27,6 +28,15 @@ export async function POST(request: Request) {
   if (!ctx) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   if (!can(ctx.role, "experiments:write")) {
     return NextResponse.json({ error: "Your role cannot create experiments." }, { status: 403 });
+  }
+
+  try {
+    await assertAIWithinBudget(ctx.organizationId);
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      return NextResponse.json({ error: error.message, code: "AI_BUDGET" }, { status: 429 });
+    }
+    throw error;
   }
 
   const limit = rateLimit(`variants:${ctx.userId}`, { limit: 20, windowMs: 5 * 60_000 });
@@ -86,6 +96,15 @@ export async function POST(request: Request) {
       .join("\n");
 
     const variants = z.array(z.string().min(1).max(2000)).parse(extractJson(text));
+
+    await recordAIUsage(ctx.organizationId, {
+      actions: 1,
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+      cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+      cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+    }).catch(() => undefined);
+
     return NextResponse.json({ variants: variants.slice(0, input.count) });
   } catch (error) {
     // Upstream errors can quote the request or the key's account; log them

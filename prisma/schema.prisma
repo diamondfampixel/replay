@@ -71,14 +71,54 @@ model Organization {
   id        String   @id @default(cuid())
   name      String
   slug      String   @unique
-  plan      String   @default("demo") // demo | starter | growth | pro
+  plan      String   @default("harbor") // harbor | skiff | clipper | flagship — see src/lib/plans.ts
   isDemo    Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Subscription state. Written locally today; Stripe Billing webhooks become
+  // the writer once billing is connected, so the shape matches Stripe's.
+  planStatus           SubscriptionStatus @default(ACTIVE)
+  billingCycle         BillingCycle       @default(MONTHLY)
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  stripeCustomerId     String?            @unique
+  stripeSubscriptionId String?            @unique
+
   memberships Membership[]
   stores      Store[]
   auditLogs   AuditLog[]
+  aiUsage     AIUsageDay[]
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum BillingCycle {
+  MONTHLY
+  ANNUAL
+}
+
+// One row per organization per UTC day. Actions are the customer-facing meter
+// the plan caps read; the token columns record what each organization actually
+// costs, so pricing can be checked against reality at any time.
+model AIUsageDay {
+  id               String   @id @default(cuid())
+  organizationId   String
+  day              DateTime @db.Date
+  actions          Int      @default(0)
+  inputTokens      Int      @default(0)
+  outputTokens     Int      @default(0)
+  cacheReadTokens  Int      @default(0)
+  cacheWriteTokens Int      @default(0)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, day])
 }
 
 model Membership {

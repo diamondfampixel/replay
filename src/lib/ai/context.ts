@@ -10,8 +10,15 @@ import { getOverviewMetrics } from "@/lib/services/analytics";
  * Deliberately small: the assistant retrieves detail through tools rather than
  * being handed the database. This is only enough for it to know what kind of
  * business it is operating and which nouns exist.
+ *
+ * Split into two parts for prompt caching: `stable` changes only when the
+ * operator edits store settings, so it lives inside the cached system prefix;
+ * `live` carries figures that move with every order and sits after the cache
+ * breakpoint, where changing it costs nothing.
  */
-export async function buildStoreContext(storeId: string): Promise<string> {
+export type StoreContextParts = { stable: string; live: string };
+
+export async function buildStoreContextParts(storeId: string): Promise<StoreContextParts> {
   const [store, counts, metrics, collections, categories, runningTests, integrations] =
     await Promise.all([
       prisma.store.findUniqueOrThrow({
@@ -46,13 +53,19 @@ export async function buildStoreContext(storeId: string): Promise<string> {
 
   const [activeProducts, draftProducts, orders, customers, activeDiscounts, subscribers, pendingReviews] = counts;
 
-  const lines = [
+  const stableLines = [
     `Store: ${store.name} (${store.status.toLowerCase()}, currency ${store.currency}, timezone ${store.timezone})`,
     store.description ? `What they sell: ${store.description}` : null,
     store.industry ? `Industry: ${store.industry}` : null,
     store.targetCustomer ? `Target customer: ${store.targetCustomer}` : null,
     store.brandPersonality ? `Brand voice: ${store.brandPersonality}` : null,
-    "",
+    `Checkout mode: ${store.settings?.checkoutMode ?? "simulated"}${store.settings?.checkoutMode !== "stripe" ? " (orders are recorded but no payment is processed)" : ""}.`,
+    store.isDemo
+      ? "IMPORTANT: this store contains seeded demo data generated for development. When quoting figures, note that they include demo activity and are not real business performance."
+      : null,
+  ];
+
+  const lines = [
     `Catalog: ${activeProducts} active products, ${draftProducts} drafts.`,
     categories.length ? `Categories: ${categories.map((c) => c.name).join(", ")}.` : "No categories yet.",
     collections.length
@@ -67,17 +80,20 @@ export async function buildStoreContext(storeId: string): Promise<string> {
     runningTests.length
       ? `Running A/B tests: ${runningTests.map((test) => `${test.name} (${test.testType})`).join("; ")}.`
       : "No A/B tests are running.",
-    "",
-    `Checkout mode: ${store.settings?.checkoutMode ?? "simulated"}${store.settings?.checkoutMode !== "stripe" ? " (orders are recorded but no payment is processed)" : ""}.`,
     integrations.length
       ? `Connected integrations: ${integrations.map((i) => i.provider).join(", ")}.`
       : "No integrations are connected, so email cannot be sent and payments are simulated.",
-    store.isDemo
-      ? "IMPORTANT: this store contains seeded demo data generated for development. When quoting figures, note that they include demo activity and are not real business performance."
-      : null,
   ];
 
-  return lines.filter((line) => line !== null).join("\n");
+  return {
+    stable: stableLines.filter((line) => line !== null).join("\n"),
+    live: lines.filter((line) => line !== null).join("\n"),
+  };
+}
+
+export async function buildStoreContext(storeId: string): Promise<string> {
+  const parts = await buildStoreContextParts(storeId);
+  return `${parts.stable}\n\n${parts.live}`;
 }
 
 export const SYSTEM_PROMPT = `You are the business assistant inside Halyard, an ecommerce operating platform. You work for the person running this store.

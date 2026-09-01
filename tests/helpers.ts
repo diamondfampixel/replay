@@ -29,6 +29,9 @@ export async function createTestStore(label: string) {
   });
 
   await testDb.store.update({ where: { id: store.id }, data: { status: "ACTIVE" } });
+  // Feature tests exercise behaviour, not plan gates, so test organizations get
+  // the top plan. Plan-limit tests set the plan they need explicitly.
+  await testDb.organization.update({ where: { id: organization.id }, data: { plan: "flagship" } });
 
   const ctx: ServiceContext = {
     storeId: store.id,

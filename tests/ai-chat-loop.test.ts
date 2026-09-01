@@ -17,7 +17,12 @@ let productId: string;
 
 const responses: Array<{ content: unknown[] }> = [];
 type MockRequest = { messages: Array<{ role: string; content: unknown }> };
-const createSpy = vi.fn(async (request: MockRequest) => (void request, responses.shift()) ?? { content: [{ type: "text", text: "" }] });
+const mockUsage = { input_tokens: 900, output_tokens: 120, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
+const createSpy = vi.fn(async (request: MockRequest) => {
+  void request;
+  const next = responses.shift() ?? { content: [{ type: "text", text: "" }] };
+  return { usage: mockUsage, ...next };
+});
 
 vi.mock("@/lib/ai/client", async () => {
   const actual = await vi.importActual<typeof import("@/lib/ai/client")>("@/lib/ai/client");

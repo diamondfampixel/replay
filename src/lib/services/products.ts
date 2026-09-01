@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma, type Prisma, type ProductStatus } from "@/lib/db";
 import { slugify } from "@/lib/utils";
+import { assertCanAddProduct } from "@/lib/services/billing";
 import { toNumber } from "@/lib/money";
 import {
   audit, authorize, NotFoundError, uniqueStoreSlug, ValidationError, type ServiceContext,
@@ -194,6 +195,7 @@ function variantTitle(options: Record<string, string>, fallback: string) {
 
 export async function createProduct(ctx: ServiceContext, raw: unknown) {
   authorize(ctx, "catalog:write");
+  await assertCanAddProduct(ctx);
   const input = productInputSchema.parse(raw);
   const slug = await uniqueStoreSlug("product", ctx.storeId, input.slug || slugify(input.title));
 

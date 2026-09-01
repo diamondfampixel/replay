@@ -1,7 +1,12 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 
-export const DEFAULT_MODEL = "claude-opus-5";
+/**
+ * Sonnet 5 is the product default: strong at tool use, fast enough for chat,
+ * and 2.5x cheaper than Opus — which is what makes the plan AI budgets
+ * profitable. ANTHROPIC_MODEL overrides it per deployment.
+ */
+export const DEFAULT_MODEL = "claude-sonnet-5";
 
 export type AIConfig = {
   apiKey: string;
@@ -16,7 +21,11 @@ export type AIConfig = {
  * own Anthropic integration is used.
  */
 export async function getAIConfig(storeId: string): Promise<AIConfig | null> {
-  const envKey = process.env.ANTHROPIC_API_KEY?.trim();
+  // HALYARD_ANTHROPIC_KEY is the same credential under a deployment-specific
+  // name, for hosts where ANTHROPIC_API_KEY would collide with other tooling
+  // (the Claude Code cloud environment injects variables under chosen names).
+  const envKey =
+    process.env.ANTHROPIC_API_KEY?.trim() || process.env.HALYARD_ANTHROPIC_KEY?.trim();
   if (envKey) {
     return {
       apiKey: envKey,

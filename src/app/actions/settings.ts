@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { audit, serviceContext } from "@/lib/services/context";
 import { requireContext, revokeOtherSessions } from "@/lib/session";
 import { fail, fromZodError, guard, ok } from "@/lib/action-result";
+import { assertCanAddTeamMember } from "@/lib/services/billing";
 import { assertCan } from "@/lib/permissions";
 import { hashPassword, verifyPassword } from "@/lib/auth";
 import type { Role } from "@/generated/prisma/client";
@@ -135,6 +136,7 @@ export async function inviteMemberAction(email: string, role: Role) {
   return guard(async () => {
     const ctx = await serviceContext();
     assertCan(ctx.role, "team:manage");
+    await assertCanAddTeamMember(ctx);
 
     const normalised = email.trim().toLowerCase();
     const user = await prisma.user.findUnique({ where: { email: normalised } });
