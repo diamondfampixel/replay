@@ -242,6 +242,15 @@ export async function changePlan(
   const target = getPlan(targetId);
   if (current.id === target.id && org.billingCycle === cycle) return org;
 
+  // With a live Stripe subscription, the subscription is the source of truth:
+  // moving off a paid plan goes through Stripe's portal so the charge actually
+  // stops, rather than a local write that leaves them paying.
+  if (org.stripeSubscriptionId && process.env.STRIPE_SECRET_KEY?.trim()) {
+    throw new ValidationError(
+      "This organization has an active paid subscription. Change or cancel it from Manage billing so the charge follows the plan.",
+    );
+  }
+
   const blockers: string[] = [];
   if (target.limits.teamMembers !== null) {
     const members = await prisma.membership.count({ where: { organizationId: ctx.organizationId } });

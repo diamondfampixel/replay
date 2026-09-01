@@ -62,13 +62,49 @@ export function BillingSettings({
 
   async function choose(id: PlanId) {
     setBusy(id);
-    const result = await changePlanAction(id, cycle);
-    setBusy(null);
-    if (result.ok) {
-      toast.success(result.message ?? "Plan updated");
-      router.refresh();
-    } else {
-      toast.error(result.error);
+    try {
+      const target = getPlan(id);
+      // With Stripe connected, paid plans check out through Stripe and the
+      // webhook applies the change; without it, changes are local and free.
+      if (billingConnected && target.monthly > 0) {
+        const response = await fetch("/api/billing/checkout", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ planId: id, cycle }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.url) {
+          toast.error(data.error ?? "Could not start checkout.");
+          return;
+        }
+        window.location.assign(data.url);
+        return;
+      }
+
+      const result = await changePlanAction(id, cycle);
+      if (result.ok) {
+        toast.success(result.message ?? "Plan updated");
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function openPortal() {
+    setBusy("portal");
+    try {
+      const response = await fetch("/api/billing/portal", { method: "POST" });
+      const data = await response.json();
+      if (!response.ok || !data.url) {
+        toast.error(data.error ?? "Could not open the billing portal.");
+        return;
+      }
+      window.location.assign(data.url);
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -107,7 +143,16 @@ export function BillingSettings({
         </CardContent>
       </Card>
 
-      {!billingConnected && (
+      {billingConnected ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-ink-200 bg-white px-4 py-3">
+          <p className="text-[13px] text-ink-600">
+            Invoices, payment method and cancellation are managed in the Stripe billing portal.
+          </p>
+          <Button size="sm" variant="secondary" loading={busy === "portal"} onClick={openPortal}>
+            Manage billing
+          </Button>
+        </div>
+      ) : (
         <div className="rounded-lg border border-ink-200 bg-ink-50 px-4 py-3 text-[13px] text-ink-600">
           <span className="font-medium text-ink-900">Billing is not connected yet.</span> Plan changes
           apply immediately and nothing is charged. When Stripe billing is configured, paid plans will

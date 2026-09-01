@@ -1,3 +1,4 @@
+import { DeleteAccountCard } from "@/components/admin/danger-zone";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { requireContext } from "@/lib/session";
@@ -55,10 +56,12 @@ export default async function ProfileSettingsPage() {
             </div>
           ))}
           <p className="text-[11.5px] text-ink-400">
-            Changing your password signs out every session, including this one.
+            Changing your password signs out every other session — this one stays signed in.
           </p>
         </CardContent>
       </Card>
+
+      <DeleteAccountCard />
     </div>
   );
 }

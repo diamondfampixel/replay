@@ -46,6 +46,9 @@ export default async function MarketingLayout({ children }: { children: React.Re
             <Link href="/pricing" className="hover:text-ink-900">Pricing</Link>
             <Link href="/login" className="hover:text-ink-900">Sign in</Link>
             <Link href="/signup" className="hover:text-ink-900">Create account</Link>
+            <Link href="/privacy" className="hover:text-ink-900">Privacy</Link>
+            <Link href="/terms" className="hover:text-ink-900">Terms</Link>
+            <Link href="/refunds" className="hover:text-ink-900">Refunds</Link>
           </nav>
           <p className="text-[12px] text-ink-400">
             © {new Date().getFullYear()} Halyard. A demonstration platform.
