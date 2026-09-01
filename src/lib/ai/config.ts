@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 
-export const DEFAULT_MODEL = "claude-sonnet-4-5";
+export const DEFAULT_MODEL = "claude-opus-5";
 
 export type AIConfig = {
   apiKey: string;

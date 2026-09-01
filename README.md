@@ -182,7 +182,7 @@ says it is not configured rather than pretending.
 | `AUTH_SECRET` | **yes** | Signs session and reset tokens. `openssl rand -base64 32` |
 | `NEXT_PUBLIC_APP_URL` | no | Public base URL |
 | `ANTHROPIC_API_KEY` | no | Enables the assistant, store builder and variant generation |
-| `ANTHROPIC_MODEL` | no | Defaults to `claude-sonnet-4-5` |
+| `ANTHROPIC_MODEL` | no | Defaults to `claude-opus-5` |
 | `STRIPE_SECRET_KEY` | no | Live payments (see below) |
 | `STRIPE_WEBHOOK_SECRET` | no | Stripe webhook signature verification |
 | `RESEND_API_KEY` | no | Real campaign sending |
@@ -377,7 +377,12 @@ PLAYWRIGHT_CHROMIUM_PATH=/path/to/chromium npm run smoke
 
 ## Deployment
 
-Halyard runs anywhere Node 20 and PostgreSQL are available.
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fdiamondfampixel%2Freplay&env=DATABASE_URL,AUTH_SECRET,NEXT_PUBLIC_APP_URL&envDescription=DATABASE_URL%20from%20a%20managed%20Postgres%2C%20AUTH_SECRET%20from%20openssl%20rand%20-base64%2032&project-name=halyard&repository-name=halyard)
+
+Step-by-step instructions (Vercel + Neon, ~10 minutes) are in
+[DEPLOY.md](./DEPLOY.md), including the serverless caveats for media uploads
+and rate limiting. Halyard runs anywhere Node 20 and PostgreSQL are
+available:
 
 ```bash
 npm ci

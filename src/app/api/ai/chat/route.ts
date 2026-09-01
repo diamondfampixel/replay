@@ -92,7 +92,9 @@ export async function POST(request: Request) {
         for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
           const response = await anthropic.messages.create({
             model: config.model,
-            max_tokens: 4096,
+            // Room for a long tool-planning turn; hitting the cap truncates
+            // mid-thought and burns a round.
+            max_tokens: 16000,
             system: [
               { type: "text", text: SYSTEM_PROMPT },
               { type: "text", text: `## The store you are operating\n\n${storeContext}` },

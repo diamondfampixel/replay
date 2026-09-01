@@ -341,7 +341,7 @@ export const INTEGRATION_CATALOG: IntegrationDefinition[] = [
       {
         key: "model",
         label: "Model",
-        placeholder: "claude-sonnet-4-5",
+        placeholder: "claude-opus-5",
         optional: true,
         help: "Leave blank to use the server default.",
       },
