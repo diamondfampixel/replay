@@ -28,11 +28,20 @@ export type Plan = {
     products: number | null;
     teamMembers: number | null;
     runningExperiments: number | null;
-    /** Null on Harbor — free AI is metered per day instead. */
+    /** Monthly allowance on paid plans; null on Harbor. */
     aiActionsPerMonth: number | null;
-    aiActionsPerDay: number | null;
+    /**
+     * One-time allowance for the free plan — spent once, never refilled. Free
+     * exists to build and explore, not to run a business on a drip of free
+     * API cost; the allowance ending is the natural "make it real" moment.
+     */
+    aiStarterActions: number | null;
     emailCampaigns: boolean;
     liveCheckout: boolean;
+    /** Connecting a custom domain — an operating concern, so paid. */
+    customDomain: boolean;
+    /** Free storefronts carry a small "Built on Halyard" credit. */
+    halyardBranding: boolean;
     analyticsHistoryDays: number | null;
     analyticsExport: boolean;
   };
@@ -43,26 +52,29 @@ export const PLANS: Plan[] = [
   {
     id: "harbor",
     name: "Harbor",
-    tagline: "The whole platform, in the harbor. Build the store, try the AI.",
+    tagline: "Build the whole store, free. Launch it when you're ready.",
     monthly: 0,
     annualMonthly: 0,
     introFirstMonth: null,
     features: [
-      "Full admin and storefront",
-      "AI assistant — 10 actions a day",
-      "Up to 25 products",
+      "Full admin, storefront and page editor",
+      "Up to 50 products",
+      "50 AI actions to build with",
       "1 A/B test running",
       "Checkout in test mode",
+      "Built on Halyard storefront credit",
     ],
     limits: {
       stores: 1,
-      products: 25,
+      products: 50,
       teamMembers: 1,
       runningExperiments: 1,
       aiActionsPerMonth: null,
-      aiActionsPerDay: 10,
+      aiStarterActions: 50,
       emailCampaigns: false,
       liveCheckout: false,
+      customDomain: false,
+      halyardBranding: true,
       analyticsHistoryDays: 30,
       analyticsExport: false,
     },
@@ -76,11 +88,11 @@ export const PLANS: Plan[] = [
     introFirstMonth: 1,
     features: [
       "Live checkout, 0% platform fees",
+      "Custom domain, no Halyard branding",
       "Unlimited products",
       "300 AI actions a month",
       "2 A/B tests running",
       "2 team members",
-      "Full analytics history",
     ],
     limits: {
       stores: 1,
@@ -88,9 +100,11 @@ export const PLANS: Plan[] = [
       teamMembers: 2,
       runningExperiments: 2,
       aiActionsPerMonth: 300,
-      aiActionsPerDay: null,
+      aiStarterActions: null,
       emailCampaigns: false,
       liveCheckout: true,
+      customDomain: true,
+      halyardBranding: false,
       analyticsHistoryDays: null,
       analyticsExport: false,
     },
@@ -115,9 +129,11 @@ export const PLANS: Plan[] = [
       teamMembers: 5,
       runningExperiments: null,
       aiActionsPerMonth: 1500,
-      aiActionsPerDay: null,
+      aiStarterActions: null,
       emailCampaigns: true,
       liveCheckout: true,
+      customDomain: true,
+      halyardBranding: false,
       analyticsHistoryDays: null,
       analyticsExport: false,
     },
@@ -143,9 +159,11 @@ export const PLANS: Plan[] = [
       teamMembers: null,
       runningExperiments: null,
       aiActionsPerMonth: 6000,
-      aiActionsPerDay: null,
+      aiStarterActions: null,
       emailCampaigns: true,
       liveCheckout: true,
+      customDomain: true,
+      halyardBranding: false,
       analyticsHistoryDays: null,
       analyticsExport: true,
     },

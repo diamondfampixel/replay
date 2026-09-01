@@ -54,6 +54,12 @@ export function providerErrorMessage(error: unknown): string | null {
   if (error instanceof AINotConfiguredError) return error.message;
   if (!(error instanceof Anthropic.APIError)) return null;
 
+  // The most common failure on a brand-new Anthropic account: the key is
+  // valid but the account holds no prepaid credits yet.
+  if (error.status === 400 && /credit balance/i.test(error.message)) {
+    return "The Anthropic account behind the configured API key has no credits. Buy credits at console.anthropic.com under Billing, then try again — the key itself is fine.";
+  }
+
   switch (error.status) {
     case 401:
     case 403:

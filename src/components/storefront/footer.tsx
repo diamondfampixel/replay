@@ -44,7 +44,11 @@ export function StorefrontFooter({ store }: { store: StorefrontStore }) {
         <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-ink-200 pt-5 text-[12px] text-ink-400">
           <p>© {new Date().getFullYear()} {store.name}</p>
           {store.contactEmail && <a href={`mailto:${store.contactEmail}`} className="hover:text-ink-700">{store.contactEmail}</a>}
-          <p>Powered by Halyard</p>
+          {store.showHalyardCredit && (
+            <Link href="/" className="hover:text-ink-700">
+              Built on Halyard
+            </Link>
+          )}
         </div>
       </div>
     </footer>

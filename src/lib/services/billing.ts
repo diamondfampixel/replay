@@ -28,8 +28,9 @@ export async function getOrganizationPlan(organizationId: string): Promise<Plan>
 
 export type AIBudget = {
   plan: Plan;
-  usedToday: number;
   usedThisMonth: number;
+  /** Lifetime actions — what the free starter allowance is measured against. */
+  usedAllTime: number;
   /** Remaining actions under whichever meter the plan uses. Null = unmetered. */
   remaining: number | null;
   /** True when the next action would exceed the plan's budget. */
@@ -39,28 +40,31 @@ export type AIBudget = {
 export async function getAIBudget(organizationId: string): Promise<AIBudget> {
   const plan = await getOrganizationPlan(organizationId);
 
-  const [today, month] = await Promise.all([
-    prisma.aIUsageDay.findUnique({
-      where: { organizationId_day: { organizationId, day: utcToday() } },
-      select: { actions: true },
-    }),
+  const [month, allTime] = await Promise.all([
     prisma.aIUsageDay.aggregate({
       where: { organizationId, day: { gte: utcMonthStart() } },
       _sum: { actions: true },
     }),
+    prisma.aIUsageDay.aggregate({
+      where: { organizationId },
+      _sum: { actions: true },
+    }),
   ]);
 
-  const usedToday = today?.actions ?? 0;
   const usedThisMonth = month._sum.actions ?? 0;
+  const usedAllTime = allTime._sum.actions ?? 0;
 
   let remaining: number | null = null;
-  if (plan.limits.aiActionsPerDay !== null) {
-    remaining = Math.max(0, plan.limits.aiActionsPerDay - usedToday);
+  if (plan.limits.aiStarterActions !== null) {
+    // The free allowance is one-time: spent across the account's whole life,
+    // never refilled. Free is for building; a refilling drip would let a live
+    // business run on our API bill indefinitely.
+    remaining = Math.max(0, plan.limits.aiStarterActions - usedAllTime);
   } else if (plan.limits.aiActionsPerMonth !== null) {
     remaining = Math.max(0, plan.limits.aiActionsPerMonth - usedThisMonth);
   }
 
-  return { plan, usedToday, usedThisMonth, remaining, exhausted: remaining === 0 };
+  return { plan, usedThisMonth, usedAllTime, remaining, exhausted: remaining === 0 };
 }
 
 /**
@@ -71,9 +75,9 @@ export async function assertAIWithinBudget(organizationId: string): Promise<AIBu
   const budget = await getAIBudget(organizationId);
   if (!budget.exhausted) return budget;
 
-  if (budget.plan.limits.aiActionsPerDay !== null) {
+  if (budget.plan.limits.aiStarterActions !== null) {
     throw new ValidationError(
-      `You've used today's ${budget.plan.limits.aiActionsPerDay} free AI actions. They reset at midnight UTC — or upgrade for a monthly allowance.`,
+      `You've used all ${budget.plan.limits.aiStarterActions} of Harbor's starter AI actions. Paid plans include a monthly allowance — from 300 actions on Skiff.`,
     );
   }
   throw new ValidationError(
@@ -178,8 +182,8 @@ export type BillingView = {
   cancelAtPeriodEnd: boolean;
   billingConnected: boolean;
   usage: {
-    aiToday: number;
     aiThisMonth: number;
+    aiAllTime: number;
     aiRemaining: number | null;
     teamMembers: number;
     products: number;
@@ -205,8 +209,8 @@ export async function getBillingView(ctx: ServiceContext): Promise<BillingView> 
     cancelAtPeriodEnd: org.cancelAtPeriodEnd,
     billingConnected: Boolean(process.env.STRIPE_SECRET_KEY?.trim()),
     usage: {
-      aiToday: budget.usedToday,
       aiThisMonth: budget.usedThisMonth,
+      aiAllTime: budget.usedAllTime,
       aiRemaining: budget.remaining,
       teamMembers,
       products,

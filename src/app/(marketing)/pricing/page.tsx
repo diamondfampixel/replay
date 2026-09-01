@@ -12,10 +12,12 @@ const rows: Array<{ label: string; value: (p: (typeof PLANS)[number]) => string 
   {
     label: "AI actions",
     value: (p) =>
-      p.limits.aiActionsPerDay !== null
-        ? `${p.limits.aiActionsPerDay} / day`
+      p.limits.aiStarterActions !== null
+        ? `${p.limits.aiStarterActions} to start`
         : `${p.limits.aiActionsPerMonth!.toLocaleString()} / month`,
   },
+  { label: "Custom domain", value: (p) => (p.limits.customDomain ? "Yes" : "—") },
+  { label: "Halyard branding", value: (p) => (p.limits.halyardBranding ? "Small storefront credit" : "None") },
   { label: "A/B tests running", value: (p) => (p.limits.runningExperiments === null ? "Unlimited" : String(p.limits.runningExperiments)) },
   { label: "Email campaigns", value: (p) => (p.limits.emailCampaigns ? "Yes" : "—") },
   { label: "Analytics history", value: (p) => (p.limits.analyticsHistoryDays === null ? "Everything" : `${p.limits.analyticsHistoryDays} days`) },
@@ -26,7 +28,7 @@ const rows: Array<{ label: string; value: (p: (typeof PLANS)[number]) => string 
 const faq = [
   {
     q: "What counts as an AI action?",
-    a: "One task you give the assistant — a question answered, a product created, a price change proposed. A big multi-step job may count as a few. Reading your own dashboards never costs actions.",
+    a: "One task you give the assistant — a question answered, a product created, a price change proposed. Reading your own dashboards never costs actions. Harbor includes 50 actions to build with; paid plans refill monthly.",
   },
   {
     q: "Do you take a cut of my sales?",
@@ -34,7 +36,7 @@ const faq = [
   },
   {
     q: "What happens if I hit my AI limit?",
-    a: "The assistant pauses until your allowance resets (midnight UTC on Harbor, monthly on paid plans) or you upgrade. Nothing else stops working — your store, checkout and analytics run as normal.",
+    a: "The assistant pauses until your monthly allowance resets or you upgrade — Harbor's 50 starter actions are one-time. Nothing else stops working; your store and analytics run as normal.",
   },
   {
     q: "Can I change plans later?",

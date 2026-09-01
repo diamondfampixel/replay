@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getPlan } from "@/lib/plans";
 import { toNumber } from "@/lib/money";
 import { getCollectionProducts } from "@/lib/services/collections";
 
@@ -17,6 +18,8 @@ export type StorefrontStore = {
   currency: string;
   contactEmail: string | null;
   isDemo: boolean;
+  /** Free-plan storefronts carry a small credit; paid plans remove it. */
+  showHalyardCredit: boolean;
   nav: Array<{ label: string; href: string }>;
   footerNav: Array<{ label: string; href: string }>;
 };
@@ -24,7 +27,10 @@ export type StorefrontStore = {
 export const getStore = cache(async (slug: string): Promise<StorefrontStore> => {
   const store = await prisma.store.findUnique({
     where: { slug },
-    include: { navigationItems: { orderBy: { position: "asc" } } },
+    include: {
+      navigationItems: { orderBy: { position: "asc" } },
+      organization: { select: { plan: true } },
+    },
   });
   if (!store || store.status === "DRAFT") notFound();
 
@@ -40,6 +46,7 @@ export const getStore = cache(async (slug: string): Promise<StorefrontStore> => 
     currency: store.currency,
     contactEmail: store.contactEmail,
     isDemo: store.isDemo,
+    showHalyardCredit: getPlan(store.organization.plan).limits.halyardBranding,
     nav: store.navigationItems.filter((item) => item.group === "main").map((item) => ({ label: item.label, href: item.href })),
     footerNav: store.navigationItems.filter((item) => item.group === "footer").map((item) => ({ label: item.label, href: item.href })),
   };
