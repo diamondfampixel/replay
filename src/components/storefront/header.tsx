@@ -7,7 +7,6 @@ import { Menu, Search, ShoppingBag, X } from "lucide-react";
 import { useCart } from "@/components/storefront/cart-provider";
 import { CartDrawer } from "@/components/storefront/cart-drawer";
 import type { StorefrontStore } from "@/lib/storefront/data";
-import { cn } from "@/lib/utils";
 
 export function StorefrontHeader({ store }: { store: StorefrontStore }) {
   const { cart, setDrawerOpen } = useCart();
