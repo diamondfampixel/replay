@@ -6,7 +6,12 @@ import { getSessionUser } from "@/lib/session";
 import { primaryCta } from "@/lib/launch";
 
 export const metadata: Metadata = {
-  title: { default: "Halyard — build your store, run it with AI", template: "%s · Halyard" },
+  // absolute: the root layout's "%s · Halyard" template would otherwise
+  // brand this twice ("Halyard — … · Halyard").
+  title: {
+    absolute: "Halyard — build your store, run it with AI",
+    template: "%s · Halyard",
+  },
   description:
     "Halyard is an AI-first ecommerce operating system: one place to build a storefront, manage products and orders, read analytics, and run growth — with an assistant that does the work.",
   openGraph: {
