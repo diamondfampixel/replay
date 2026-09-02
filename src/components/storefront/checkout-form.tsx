@@ -227,11 +227,16 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-[12.5px] font-medium text-ink-700">
-        {label}
-        {required && <span className="ml-0.5 text-[var(--color-signal-negative)]">*</span>}
+      {/* The control sits inside the label so assistive tech announces the
+          field name — a htmlFor/id pair can't be wired up here because the
+          children are opaque to this wrapper. */}
+      <label className="block">
+        <span className="mb-1.5 block text-[12.5px] font-medium text-ink-700">
+          {label}
+          {required && <span className="ml-0.5 text-[var(--color-signal-negative)]">*</span>}
+        </span>
+        {children}
       </label>
-      {children}
       {error && <p className="mt-1 text-[12px] text-[var(--color-signal-negative)]">{error}</p>}
     </div>
   );
