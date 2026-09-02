@@ -1,26 +1,22 @@
-import { Hero } from "@/components/marketing/hero";
-import {
-  AssistantSection, BuildSection, FaqSection, FinalCtaSection, GrowSection,
-  IntroSection, OperateSection, PricingSection, ReplaceStackSection,
-} from "@/components/marketing/sections";
-import { primaryCta } from "@/lib/launch";
+import { launchStage } from "@/lib/launch";
+import { MarketingShell } from "@/components/marketing/chrome";
+import { FullLanding } from "@/components/marketing/full-landing";
+import { WaitlistScreen } from "@/components/marketing/waitlist-screen";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * The public entry point is decided by LAUNCH_STAGE alone. During the gated
+ * stages it is the one-screen waitlist; at public launch the full landing
+ * returns here without a rebuild (it stays previewable at /product meanwhile).
+ */
 export default function LandingPage() {
-  const cta = primaryCta();
-  return (
-    <main>
-      <Hero cta={cta} />
-      <IntroSection />
-      <AssistantSection />
-      <BuildSection />
-      <OperateSection />
-      <GrowSection />
-      <ReplaceStackSection />
-      <PricingSection />
-      <FaqSection />
-      <FinalCtaSection cta={cta} />
-    </main>
-  );
+  if (launchStage() === "public") {
+    return (
+      <MarketingShell>
+        <FullLanding />
+      </MarketingShell>
+    );
+  }
+  return <WaitlistScreen />;
 }

@@ -28,6 +28,17 @@ describe("navigation routes resolve to real pages", () => {
     expect(existsSync(pageFileForHref(href)), `${href} → ${pageFileForHref(href)} missing`).toBe(true);
   });
 
+  it("keeps every public marketing page on disk after the (site) regrouping", () => {
+    const marketing = join(process.cwd(), "src/app/(marketing)");
+    for (const rel of ["page.tsx", "(site)/product/page.tsx", "(site)/pricing/page.tsx", "(site)/privacy/page.tsx", "(site)/terms/page.tsx", "(site)/refunds/page.tsx", "(site)/features/page.tsx"]) {
+      expect(existsSync(join(marketing, rel)), `${rel} missing`).toBe(true);
+    }
+    // The waitlist screen's bottom links must resolve too.
+    for (const rel of ["(site)/privacy/page.tsx", "(site)/terms/page.tsx"]) {
+      expect(existsSync(join(marketing, rel))).toBe(true);
+    }
+  });
+
   it("covers the whole primary sidebar (guards against an emptied nav)", () => {
     expect(adminHrefs.length).toBeGreaterThanOrEqual(15);
   });
