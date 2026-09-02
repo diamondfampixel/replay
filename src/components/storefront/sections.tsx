@@ -60,7 +60,10 @@ export async function SectionRenderer({
       const styles: Record<string, React.CSSProperties> = {
         white: { background: "var(--st-bg)", color: "var(--st-fg)" },
         muted: { background: "var(--st-surface-alt)", color: "var(--st-fg)" },
-        brand: { background: "var(--st-accent)", color: "var(--st-accent-fg)" },
+        brand: {
+          background: "var(--st-brand-bg)", color: "var(--st-brand-fg)",
+          ["--st-muted-fg" as string]: "var(--st-brand-fg)",
+        },
       };
       const centered = config.align === "center";
       const hasImage = Boolean(config.imageUrl);

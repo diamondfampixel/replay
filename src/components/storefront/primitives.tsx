@@ -126,11 +126,20 @@ export function SectionShell({
 }) {
   // Background roles resolve to theme tokens so a section reads correctly on
   // every design direction (a "muted" band on a warm store is warm, not grey).
+  // On coloured grounds the muted-text token is re-derived from that ground's
+  // own foreground, so subheadings stay legible instead of using the light-page
+  // muted colour on a dark/accent band.
   const styles: Record<string, React.CSSProperties> = {
     white: { background: "var(--st-bg)", color: "var(--st-fg)" },
     muted: { background: "var(--st-surface-alt)", color: "var(--st-fg)" },
-    brand: { background: "var(--st-accent)", color: "var(--st-accent-fg)" },
-    ink: { background: "var(--st-contrast-bg)", color: "var(--st-contrast-fg)" },
+    brand: {
+      background: "var(--st-brand-bg)", color: "var(--st-brand-fg)",
+      ["--st-muted-fg" as string]: "var(--st-brand-fg)",
+    },
+    ink: {
+      background: "var(--st-contrast-bg)", color: "var(--st-contrast-fg)",
+      ["--st-muted-fg" as string]: "var(--st-contrast-fg)",
+    },
   };
   // Density scales with the theme; the enum nudges it up or down a step.
   const pad: Record<string, string> = {

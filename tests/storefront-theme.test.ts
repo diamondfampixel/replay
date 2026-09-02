@@ -72,6 +72,18 @@ describe("resolveTheme", () => {
     }
   });
 
+  it("keeps muted text at WCAG AA on both the page and surface grounds", () => {
+    for (const neutral of ["warm", "cool", "pure", "sand", "slate"] as const) {
+      const t = resolveTheme({ theme: { direction: "modern", neutral }, primaryColor: "#2f6bff" });
+      // Muted text appears on the page bg AND the darker surface-alt (footer,
+      // muted sections) — it must clear AA on both.
+      for (const ground of ["--st-bg", "--st-surface-alt"] as const) {
+        const ratio = contrastRatio(t.vars["--st-muted-fg"], t.vars[ground]);
+        expect(ratio, `${neutral} muted on ${ground} → ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  });
+
   it("only loads fonts the store actually uses", () => {
     const t = resolveTheme({ theme: { direction: "modern" }, primaryColor: "#000" });
     const href = googleFontsHref(t)!;

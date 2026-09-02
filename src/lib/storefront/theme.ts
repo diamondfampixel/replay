@@ -297,7 +297,16 @@ export function resolveTheme(input: {
   const surfaceAlt = rgbToHex(mix(base.bg, base.ink, 0.05));
   const border = rgbToHex(mix(base.bg, base.ink, 0.14));
   const borderStrong = rgbToHex(mix(base.bg, base.ink, 0.24));
-  const mutedInk = rgbToHex(mix(base.bg, base.ink, 0.55));
+  // Muted text must clear WCAG AA on BOTH grounds it can sit on: the page bg
+  // and the slightly darker surface-alt (muted sections, footer). Tuning
+  // against the darker of the two guarantees it on both.
+  const mutedGround = surfaceAlt;
+  let mutedMix = 0.62;
+  let mutedInk = rgbToHex(mix(base.bg, base.ink, mutedMix));
+  while (mutedMix < 0.85 && contrastRatio(mutedInk, mutedGround) < 4.5) {
+    mutedMix += 0.03;
+    mutedInk = rgbToHex(mix(base.bg, base.ink, mutedMix));
+  }
   const accentInk = readableInk(accent);
   const contrastPanel = rgbToHex(mix(base.ink, { r: 0, g: 0, b: 0 }, 0.15));
 
@@ -326,6 +335,11 @@ export function resolveTheme(input: {
     "--st-muted-fg": mutedInk,
     "--st-accent": accent,
     "--st-accent-fg": accentInk,
+    // Contrast-safe accent for filled *sections* (not just buttons): white/dark
+    // body text on this ground always clears WCAG AA, where the raw accent can
+    // sit a hair under for a bright mid-tone.
+    "--st-brand-bg": solid.bg,
+    "--st-brand-fg": solid.fg,
     "--st-contrast-bg": contrastPanel,
     "--st-contrast-fg": readableInk(contrastPanel),
     "--st-radius": RADIUS_PX[radius],

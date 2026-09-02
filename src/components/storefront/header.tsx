@@ -116,10 +116,10 @@ export function StorefrontHeader({ store }: { store: StorefrontStore }) {
       {menuOpen && (
         <div className="fixed inset-0 z-50 sm:hidden">
           <div className="absolute inset-0 bg-ink-950/30" onClick={() => setMenuOpen(false)} />
-          <nav className="absolute inset-y-0 left-0 w-72 bg-white p-5 shadow-xl">
+          <nav className="absolute inset-y-0 left-0 w-72 p-5 shadow-xl" style={{ background: "var(--st-bg)" }}>
             <div className="mb-6 flex items-center justify-between">
-              <span className="text-[15px] font-semibold">{store.name}</span>
-              <button type="button" onClick={() => setMenuOpen(false)} aria-label="Close menu" className="rounded p-1 text-ink-500 hover:bg-ink-100">
+              <span className="st-display text-[15px]" style={{ color: "var(--st-fg)", fontWeight: "var(--st-heading-weight)" as React.CSSProperties["fontWeight"] }}>{store.name}</span>
+              <button type="button" onClick={() => setMenuOpen(false)} aria-label="Close menu" className="st-header-link rounded p-1">
                 <X className="size-4" />
               </button>
             </div>
@@ -129,7 +129,8 @@ export function StorefrontHeader({ store }: { store: StorefrontStore }) {
                   <Link
                     href={`${base}${item.href === "/" ? "" : item.href}`}
                     onClick={() => setMenuOpen(false)}
-                    className={cn("block rounded-md px-3 py-2.5 text-[14.5px] text-ink-800 hover:bg-ink-50")}
+                    className="block rounded-md px-3 py-2.5 text-[14.5px] hover:opacity-70"
+                    style={{ color: "var(--st-fg)" }}
                   >
                     {item.label}
                   </Link>
