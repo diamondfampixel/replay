@@ -13,9 +13,12 @@ type Mode = "login" | "signup";
 export function AuthForm({
   mode,
   action,
+  requireInvite = false,
 }: {
   mode: Mode;
   action: (formData: FormData) => Promise<ActionResult<{ redirect: string }>>;
+  /** True during gated launch stages — signup asks for the invite code. */
+  requireInvite?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -54,6 +57,17 @@ export function AuthForm({
         {mode === "signup" && (
           <Field label="Name" htmlFor="name" required error={errors.name}>
             <Input id="name" name="name" autoComplete="name" placeholder="Alex Rivera" required />
+          </Field>
+        )}
+        {mode === "signup" && requireInvite && (
+          <Field
+            label="Invite code"
+            htmlFor="inviteCode"
+            required
+            error={errors.inviteCode}
+            hint="Halyard is in early access. No code yet? Join the waitlist on the homepage."
+          >
+            <Input id="inviteCode" name="inviteCode" placeholder="Your invite code" required />
           </Field>
         )}
         <Field label="Email" htmlFor="email" required error={errors.email}>

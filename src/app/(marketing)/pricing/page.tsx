@@ -47,10 +47,10 @@ const faq = [
 export default function PricingPage() {
   return (
     <main className="mx-auto max-w-6xl px-5 py-16">
-      <h1 className="text-[32px] font-semibold tracking-[-0.02em] text-ink-900">
+      <h1 className="text-[32px] font-semibold tracking-[-0.02em] text-night-text">
         Simple pricing, 0% transaction fees
       </h1>
-      <p className="mt-2 max-w-2xl text-[15px] text-ink-600">
+      <p className="mt-2 max-w-2xl text-[15px] text-night-muted">
         Start free in the Harbor. Every paid plan is $1 for the first month, and you can change or
         cancel whenever you like.
       </p>
@@ -58,25 +58,25 @@ export default function PricingPage() {
       <PlanCards />
 
       <div className="mt-14">
-        <h2 className="text-[20px] font-semibold tracking-[-0.01em] text-ink-900">
+        <h2 className="text-[20px] font-semibold tracking-[-0.01em] text-night-text">
           Compare plans
         </h2>
-        <div className="mt-4 overflow-x-auto rounded-lg border border-ink-200">
-          <table className="w-full min-w-[640px] border-collapse bg-white text-[13px]">
+        <div className="mt-4 overflow-x-auto rounded-lg border border-night-line">
+          <table className="w-full min-w-[640px] border-collapse bg-night-900 text-[13px]">
             <thead>
-              <tr className="border-b border-ink-200 text-left">
-                <th className="px-4 py-3 font-medium text-ink-500"> </th>
+              <tr className="border-b border-night-line text-left">
+                <th className="px-4 py-3 font-medium text-night-muted"> </th>
                 {PLANS.map((plan) => (
-                  <th key={plan.id} className="px-4 py-3 font-semibold text-ink-900">{plan.name}</th>
+                  <th key={plan.id} className="px-4 py-3 font-semibold text-night-text">{plan.name}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.label} className="border-b border-ink-100 last:border-0">
-                  <td className="px-4 py-2.5 text-ink-600">{row.label}</td>
+                <tr key={row.label} className="border-b border-night-line last:border-0">
+                  <td className="px-4 py-2.5 text-night-muted">{row.label}</td>
                   {PLANS.map((plan) => (
-                    <td key={plan.id} className="px-4 py-2.5 text-ink-800">{row.value(plan)}</td>
+                    <td key={plan.id} className="px-4 py-2.5 text-night-text">{row.value(plan)}</td>
                   ))}
                 </tr>
               ))}
@@ -88,8 +88,8 @@ export default function PricingPage() {
       <div className="mt-14 grid gap-6 sm:grid-cols-2">
         {faq.map((item) => (
           <div key={item.q}>
-            <h3 className="text-[14px] font-semibold text-ink-900">{item.q}</h3>
-            <p className="mt-1 text-[13.5px] leading-relaxed text-ink-600">{item.a}</p>
+            <h3 className="text-[14px] font-semibold text-night-text">{item.q}</h3>
+            <p className="mt-1 text-[13.5px] leading-relaxed text-night-muted">{item.a}</p>
           </div>
         ))}
       </div>

@@ -1,35 +1,71 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { Wordmark } from "@/components/brand";
-import { Button } from "@/components/ui/button";
+import { WordmarkNight } from "@/components/brand";
+import { PageViewTracker, TrackedLink } from "@/components/marketing/page-view";
 import { getSessionUser } from "@/lib/session";
+import { primaryCta } from "@/lib/launch";
+
+export const metadata: Metadata = {
+  title: { default: "Halyard — build your store, run it with AI", template: "%s · Halyard" },
+  description:
+    "Halyard is an AI-first ecommerce operating system: one place to build a storefront, manage products and orders, read analytics, and run growth — with an assistant that does the work.",
+  openGraph: {
+    title: "Halyard — build your store, run it with AI",
+    description:
+      "One operating system for products, orders, analytics, and growth — with an assistant that does the work.",
+    images: ["/og.png"],
+    type: "website",
+  },
+  twitter: { card: "summary_large_image", images: ["/og.png"] },
+};
 
 export default async function MarketingLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
+  const cta = primaryCta();
 
   return (
-    <div className="min-h-dvh bg-white">
-      <header className="sticky top-0 z-40 border-b border-ink-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-5">
-          <Link href="/">
-            <Wordmark />
+    <div className="min-h-dvh bg-night-950 font-sans text-night-text antialiased">
+      {/* Marketing display + mono faces — loaded only on the public site. */}
+      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;600;700&family=Spline+Sans+Mono:wght@400;500&display=swap"
+      />
+      <PageViewTracker />
+
+      <header className="fixed inset-x-0 top-0 z-40 border-b border-night-line bg-night-950/80 backdrop-blur-md">
+        <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-6 px-5">
+          <Link href="/" aria-label="Halyard home">
+            <WordmarkNight />
           </Link>
-          <nav className="hidden gap-5 text-[13px] text-ink-600 sm:flex">
-            <Link href="/features" className="hover:text-ink-900">Features</Link>
-            <Link href="/pricing" className="hover:text-ink-900">Pricing</Link>
+          <nav className="hidden gap-5 text-[13px] text-night-muted sm:flex">
+            <Link href="/#product" className="transition-colors hover:text-night-text">Product</Link>
+            <Link href="/pricing" className="transition-colors hover:text-night-text">Pricing</Link>
+            <Link href="/#faq" className="transition-colors hover:text-night-text">FAQ</Link>
           </nav>
           <div className="ml-auto flex items-center gap-2">
             {user ? (
-              <Button asChild size="sm" variant="primary">
-                <Link href="/admin">Go to dashboard</Link>
-              </Button>
+              <Link
+                href="/admin"
+                className="rounded-lg bg-night-text px-3.5 py-1.5 text-[13px] font-medium text-night-950 transition-colors hover:bg-white"
+              >
+                Open dashboard
+              </Link>
             ) : (
               <>
-                <Button asChild size="sm" variant="ghost">
-                  <Link href="/login">Sign in</Link>
-                </Button>
-                <Button asChild size="sm" variant="primary">
-                  <Link href="/signup">Start free</Link>
-                </Button>
+                <TrackedLink
+                  href="/login"
+                  event="login_click"
+                  className="rounded-lg px-3 py-1.5 text-[13px] text-night-muted transition-colors hover:text-night-text"
+                >
+                  Sign in
+                </TrackedLink>
+                <Link
+                  href={cta.kind === "waitlist" ? "/#join" : "/signup"}
+                  className="rounded-lg bg-night-text px-3.5 py-1.5 text-[13px] font-medium text-night-950 transition-colors hover:bg-white"
+                >
+                  {cta.label}
+                </Link>
               </>
             )}
           </div>
@@ -38,20 +74,22 @@ export default async function MarketingLayout({ children }: { children: React.Re
 
       {children}
 
-      <footer className="border-t border-ink-200 bg-ink-50">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 py-8">
-          <Wordmark />
-          <nav className="flex flex-wrap gap-5 text-[13px] text-ink-600">
-            <Link href="/features" className="hover:text-ink-900">Features</Link>
-            <Link href="/pricing" className="hover:text-ink-900">Pricing</Link>
-            <Link href="/login" className="hover:text-ink-900">Sign in</Link>
-            <Link href="/signup" className="hover:text-ink-900">Create account</Link>
-            <Link href="/privacy" className="hover:text-ink-900">Privacy</Link>
-            <Link href="/terms" className="hover:text-ink-900">Terms</Link>
-            <Link href="/refunds" className="hover:text-ink-900">Refunds</Link>
-          </nav>
-          <p className="text-[12px] text-ink-400">
-            © {new Date().getFullYear()} Halyard. A demonstration platform.
+      <footer className="border-t border-night-line bg-night-950">
+        <div className="mx-auto w-full max-w-6xl px-5 py-10">
+          <div className="flex flex-wrap items-center justify-between gap-6">
+            <WordmarkNight />
+            <nav className="flex flex-wrap gap-x-5 gap-y-2 text-[13px] text-night-muted">
+              <Link href="/#product" className="hover:text-night-text">Product</Link>
+              <Link href="/pricing" className="hover:text-night-text">Pricing</Link>
+              <Link href="/login" className="hover:text-night-text">Sign in</Link>
+              <Link href="/privacy" className="hover:text-night-text">Privacy</Link>
+              <Link href="/terms" className="hover:text-night-text">Terms</Link>
+              <Link href="/refunds" className="hover:text-night-text">Refunds</Link>
+            </nav>
+          </div>
+          <p className="mt-8 text-[12px] text-night-faint">
+            © {new Date().getFullYear()} Halyard. Product screens show the seeded demonstration
+            store — not a real business.
           </p>
         </div>
       </footer>

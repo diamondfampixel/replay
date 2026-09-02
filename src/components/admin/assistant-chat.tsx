@@ -329,8 +329,10 @@ export function AssistantChat({
           ))}
 
           {streaming && (
-            <div className="flex items-center gap-2 text-[13px] text-ink-400">
-              <Loader2 className="size-3.5 animate-spin" />
+            <div className="flex items-center gap-2.5 text-[13px] text-ink-400">
+              <span className="thinking-dots" aria-hidden>
+                <span /><span /><span />
+              </span>
               Working…
             </div>
           )}

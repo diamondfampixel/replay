@@ -9,7 +9,8 @@
 @theme {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  --font-mono: "Spline Sans Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  --font-display: "Schibsted Grotesk", var(--font-sans);
 
   /* Neutral ramp (very slightly warm) */
   --color-ink-50: #f8f8f7;
@@ -23,6 +24,21 @@
   --color-ink-800: #2a2a25;
   --color-ink-900: #1a1a17;
   --color-ink-950: #0f0f0d;
+
+  /* Marketing night palette — the public site's dark world. Deep blue-black,
+     never pure black, with the pine accent tuned for dark grounds. */
+  --color-night-950: #07090d;
+  --color-night-900: #0a0d13;
+  --color-night-850: #0e1219;
+  --color-night-800: #121721;
+  --color-night-700: #1a2130;
+  --color-night-line: rgba(226, 232, 240, 0.09);
+  --color-night-line-strong: rgba(226, 232, 240, 0.16);
+  --color-night-text: #e8ebef;
+  --color-night-muted: #8d95a3;
+  --color-night-faint: #5c6470;
+  --color-glow-green: #3dbd8b;
+  --color-glow-amber: #d9a441;
 
   /* Brand — pine */
   --color-pine-50: #eefaf5;
@@ -152,3 +168,42 @@ body {
 .prose-halyard a { color: var(--color-pine-700); text-decoration: underline; }
 .prose-halyard strong { font-weight: 600; }
 .prose-halyard blockquote { border-left: 3px solid var(--border); padding-left: 1rem; color: var(--text-muted); margin: 1rem 0; }
+
+/* Marketing hero: slow idle drift for floating product windows. */
+@keyframes hero-float-drift {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-9px); }
+}
+.hero-float {
+  animation: hero-float-drift 10s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-float { animation: none; }
+}
+
+/* Admin: quiet entrance for page content on navigation. */
+@keyframes admin-page-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.admin-page-enter { animation: admin-page-enter 0.22s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .admin-page-enter { animation: none; }
+}
+
+/* Assistant: thinking indicator. */
+.thinking-dots { display: inline-flex; gap: 3px; }
+.thinking-dots span {
+  width: 5px; height: 5px; border-radius: 999px;
+  background: var(--color-ink-400);
+  animation: thinking-dot 1.2s ease-in-out infinite;
+}
+.thinking-dots span:nth-child(2) { animation-delay: 0.15s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes thinking-dot {
+  0%, 60%, 100% { opacity: 0.35; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .thinking-dots span { animation: none; opacity: 0.6; }
+}

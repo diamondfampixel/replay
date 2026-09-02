@@ -1,6 +1,11 @@
 import "dotenv/config";
 import { vi } from "vitest";
 
+// The developer's .env may hold a launch stage (e.g. waitlist during
+// pre-launch). Tests assert stage behaviour explicitly, so they start neutral.
+delete process.env.LAUNCH_STAGE;
+delete process.env.WAITLIST_INVITE_CODES;
+
 // Services import `server-only`, which throws outside a React Server Component.
 vi.mock("server-only", () => ({}));
 

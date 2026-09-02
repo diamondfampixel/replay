@@ -18,6 +18,7 @@ import {
 } from "@/lib/validation/auth";
 import { fail, fromZodError, guard, ok, type ActionResult } from "@/lib/action-result";
 import { sendVerification } from "@/lib/services/verification";
+import { isValidInvite, signupIsOpen } from "@/lib/launch";
 import {
   isPlatformEmailConfigured, passwordResetEmail, sendPlatformEmail,
 } from "@/lib/platform-email";
@@ -43,6 +44,19 @@ export async function signupAction(formData: FormData): Promise<ActionResult<{ r
       password: formData.get("password"),
     });
     if (!parsed.success) return fromZodError(parsed.error);
+
+    // During the gated stages, an account needs an invite code. Nothing else
+    // changes — existing accounts sign in normally, no route disappears, and
+    // flipping LAUNCH_STAGE to "public" reopens signup with no deploy of code.
+    if (!signupIsOpen()) {
+      const invite = String(formData.get("inviteCode") ?? "");
+      if (!isValidInvite(invite)) {
+        return fail(
+          "Halyard is in early access. Join the waitlist on the homepage, or enter the invite code you were given.",
+          { inviteCode: "Invalid or missing invite code." },
+        );
+      }
+    }
 
     const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } });
     if (existing) {

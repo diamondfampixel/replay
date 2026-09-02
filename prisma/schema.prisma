@@ -1103,3 +1103,46 @@ model Notification {
 
   @@index([storeId, createdAt])
 }
+
+// ---------------------------------------------------------------------------
+// Pre-launch marketing: the waitlist and its acquisition analytics. Platform-
+// level tables — they belong to Halyard itself, not to any tenant store.
+// ---------------------------------------------------------------------------
+
+enum WaitlistStatus {
+  PENDING
+  INVITED
+  CONVERTED
+}
+
+model WaitlistEntry {
+  id          String         @id @default(cuid())
+  email       String         @unique
+  status      WaitlistStatus @default(PENDING)
+  source      String? // free-form: "tiktok", "reels", "shorts", direct…
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  referrer    String?
+  createdAt   DateTime       @default(now())
+  invitedAt   DateTime?
+}
+
+// One row per marketing event. visitorId is a random client-generated id with
+// no account linkage — enough to count unique visitors and funnels, nothing
+// more. Deliberately no IP, no user agent, no fingerprinting.
+model MarketingEvent {
+  id          String   @id @default(cuid())
+  type        String
+  path        String?
+  visitorId   String
+  source      String?
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  referrer    String?
+  createdAt   DateTime @default(now())
+
+  @@index([type, createdAt])
+  @@index([visitorId])
+}
