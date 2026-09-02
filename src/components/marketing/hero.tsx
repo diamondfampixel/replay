@@ -158,8 +158,8 @@ export function Hero({ cta }: { cta: { label: string; kind: "waitlist" | "signup
       />
 
       <div className="relative mx-auto grid min-h-[100svh] w-full max-w-6xl grid-rows-[1fr_auto] px-5 pt-24 sm:pt-0 lg:grid-rows-1">
-        {/* Copy + conversion — centered on phones (Concept C), left on desktop (Concept A) */}
-        <div className="z-10 flex max-w-xl flex-col items-center justify-center pb-6 text-center sm:pb-0 lg:items-start lg:text-left">
+        {/* Copy + conversion */}
+        <div className="z-10 flex max-w-xl flex-col justify-center pb-10 sm:pb-0">
           <motion.p
             initial={reduced ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -185,18 +185,15 @@ export function Hero({ cta }: { cta: { label: string; kind: "waitlist" | "signup
             transition={{ duration: 0.8, delay: reduced ? 0 : 0.24 }}
             className="mt-5 max-w-md text-[16px] leading-relaxed text-night-muted"
           >
-            <span className="lg:hidden">A new kind of commerce platform is coming.</span>
-            <span className="hidden lg:inline">
-              One operating system for products, orders, analytics, and growth —
-              with an assistant that does the work, and asks before anything big.
-            </span>
+            One operating system for products, orders, analytics, and growth —
+            with an assistant that does the work, and asks before anything big.
           </motion.p>
 
           <motion.div
             initial={reduced ? false : { opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: reduced ? 0 : 0.36 }}
-            className="mt-8 flex w-full flex-col items-center lg:items-start"
+            className="mt-8"
           >
             {cta.kind === "waitlist" ? (
               <WaitlistForm ctaLabel={cta.label} />
@@ -209,7 +206,7 @@ export function Hero({ cta }: { cta: { label: string; kind: "waitlist" | "signup
                 {cta.label}
               </Link>
             )}
-            <p className="mt-3 text-center font-mono text-[11px] uppercase tracking-[0.14em] text-night-faint lg:text-left">
+            <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.14em] text-night-faint">
               Build · Launch · Sell · Grow
             </p>
           </motion.div>
@@ -249,38 +246,29 @@ export function Hero({ cta }: { cta: { label: string; kind: "waitlist" | "signup
           </FloatingCard>
         </div>
 
-        {/* Mobile scene — Concept C: one dramatic tilted product-window cluster */}
-        <div className="relative z-0 mx-auto mb-14 w-full max-w-sm lg:hidden" aria-hidden>
-          <motion.div
-            initial={reduced ? false : { opacity: 0, y: 26 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.9, delay: reduced ? 0 : 0.55, ease: [0.21, 0.6, 0.28, 0.99] }}
-            style={{ perspective: "1200px" }}
-          >
-            <div
-              className={reduced ? undefined : "hero-float"}
-              style={{
-                transform: "rotateX(10deg) rotateZ(-1.5deg)",
-                transformStyle: "preserve-3d",
-                ...(reduced ? {} : { animationDuration: "12s" }),
-              }}
+        {/* Mobile composition: a compact, quietly drifting collage below the copy */}
+        <div className="relative z-0 -mx-1 mb-12 h-64 lg:hidden" aria-hidden>
+          <FloatingCard depth={0.4} parallax={parallaxFar} entrance={0.4} float={0.5} className="left-0 top-2 w-52">
+            <AssistantDemo
+              command="Run a weekend sale"
+              toolName="adjust_prices"
+              toolSummary="27 products"
+              reply="Done — sale is live."
+            />
+          </FloatingCard>
+          <FloatingCard depth={0.6} parallax={parallaxMid} entrance={0.65} float={1.7} className="right-0 top-8 w-44">
+            <RevenueChartDemo />
+          </FloatingCard>
+          <FloatingCard depth={1} parallax={parallaxNear} entrance={1.1} float={0} className="bottom-2 right-6">
+            <motion.div
+              key={order.number}
+              initial={reduced ? false : { opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
             >
-              <div className="grid grid-cols-[1fr_1.05fr] items-start gap-3">
-                <RevenueChartDemo />
-                <div className="space-y-3">
-                  <motion.div
-                    key={order.number}
-                    initial={reduced ? false : { opacity: 0, y: 10, scale: 0.97 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{ duration: 0.5, ease: [0.21, 0.6, 0.28, 0.99] }}
-                  >
-                    <OrderToastDemo number={order.number} total={order.total} />
-                  </motion.div>
-                  <StorefrontMiniDemo />
-                </div>
-              </div>
-            </div>
-          </motion.div>
+              <OrderToastDemo number={order.number} total={order.total} />
+            </motion.div>
+          </FloatingCard>
         </div>
       </div>
     </section>
