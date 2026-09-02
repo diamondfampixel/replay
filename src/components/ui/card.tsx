@@ -5,7 +5,11 @@ export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElemen
   return (
     <div
       className={cn(
-        "rounded-lg border border-ink-200 bg-white shadow-[0_1px_2px_rgba(16,16,14,0.04)]",
+        // min-w-0 lets a card shrink below its content's intrinsic width when
+        // it sits in a grid/flex track; row internals handle their own
+        // truncation. Without it, dense cards force horizontal page scroll on
+        // phones.
+        "min-w-0 rounded-lg border border-ink-200 bg-white shadow-[0_1px_2px_rgba(16,16,14,0.04)]",
         className,
       )}
       {...props}
