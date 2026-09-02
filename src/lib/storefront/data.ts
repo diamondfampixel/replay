@@ -3,6 +3,7 @@ import { cache } from "react";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getPlan } from "@/lib/plans";
+import { getActiveContext } from "@/lib/session";
 import { toNumber } from "@/lib/money";
 import { getCollectionProducts } from "@/lib/services/collections";
 
@@ -32,7 +33,16 @@ export const getStore = cache(async (slug: string): Promise<StorefrontStore> => 
       organization: { select: { plan: true } },
     },
   });
-  if (!store || store.status === "DRAFT") notFound();
+  if (!store) notFound();
+
+  // A draft store is the operator's private preview: they see the real
+  // storefront (with a draft banner) before setting it live, while the
+  // public keeps getting a 404. This is what lets a free account build and
+  // preview the whole customer experience before launching.
+  if (store.status === "DRAFT") {
+    const ctx = await getActiveContext();
+    if (ctx?.storeId !== store.id) notFound();
+  }
 
   return {
     id: store.id,

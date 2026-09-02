@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { getActiveContext } from "@/lib/session";
 import { fail, fromZodError, guard, ok } from "@/lib/action-result";
 import {
   addToCart, applyCartDiscount, emptyCart, getCart, getCartView, removeCartItem, updateCartItem,
@@ -21,7 +22,13 @@ async function storeBySlug(slug: string) {
     where: { slug },
     select: { id: true, organizationId: true, currency: true, status: true, settings: true },
   });
-  if (!store || store.status === "DRAFT") throw new Error("This store is not available.");
+  if (!store) throw new Error("This store is not available.");
+  if (store.status === "DRAFT") {
+    // The operator may exercise their own draft store end to end — cart and
+    // simulated checkout included. Anyone else is told nothing exists.
+    const ctx = await getActiveContext();
+    if (ctx?.storeId !== store.id) throw new Error("This store is not available.");
+  }
   return store;
 }
 
@@ -31,6 +38,10 @@ async function storeBySlug(slug: string) {
  * changed a badge while checkout carried on working.
  */
 function assertAcceptingOrders(store: { status: string }) {
+  if (store.status === "DRAFT") {
+    // Only the operator can reach a draft storefront, so this message talks to them.
+    throw new Error("This store is still a draft. Set it live from Store settings to start taking orders.");
+  }
   if (store.status !== "ACTIVE") {
     throw new Error("This store is not accepting orders right now.");
   }

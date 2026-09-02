@@ -48,7 +48,15 @@ export default async function StorefrontLayout({
         <StorefrontAnalytics storeSlug={storeSlug} sessionId={sessionId}>
           <CartProvider storeSlug={storeSlug} initialCart={cart}>
             <StorefrontHeader store={store} />
-            {store.status !== "ACTIVE" && (
+            {store.status === "DRAFT" ? (
+              <div
+                role="status"
+                className="border-b border-sky-200 bg-sky-50 px-4 py-2.5 text-center text-[13px] text-sky-900"
+              >
+                Draft preview — only you can see this store. Set it live from Store settings
+                when you&apos;re ready to share it.
+              </div>
+            ) : store.status !== "ACTIVE" ? (
               <div
                 role="status"
                 className="border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-center text-[13px] text-amber-900"
@@ -56,7 +64,7 @@ export default async function StorefrontLayout({
                 {store.name} is not accepting orders at the moment. You can still browse —
                 checkout will reopen when the store does.
               </div>
-            )}
+            ) : null}
             <main className="flex-1">{children}</main>
             <StorefrontFooter store={store} />
           </CartProvider>
