@@ -17,8 +17,8 @@
   --color-ink-100: #f1f1ef;
   --color-ink-200: #e5e5e1;
   --color-ink-300: #d3d3ce;
-  --color-ink-400: #a5a59d;
-  --color-ink-500: #78786f;
+  --color-ink-400: #71716a; /* AA: 4.9:1 on white, 4.6:1 on ink-50 */
+  --color-ink-500: #63635b; /* AA: 6.1:1 on white */
   --color-ink-600: #57574f;
   --color-ink-700: #414139;
   --color-ink-800: #2a2a25;
@@ -36,7 +36,7 @@
   --color-night-line-strong: rgba(226, 232, 240, 0.16);
   --color-night-text: #e8ebef;
   --color-night-muted: #8d95a3;
-  --color-night-faint: #5c6470;
+  --color-night-faint: #727b88; /* AA: 4.65:1 on night-950 */
   --color-glow-green: #3dbd8b;
   --color-glow-amber: #d9a441;
 

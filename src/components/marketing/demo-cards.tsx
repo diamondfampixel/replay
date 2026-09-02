@@ -79,7 +79,7 @@ export function OrderToastDemo({ className, number = 4581, total = "$86.30" }: {
       </span>
       <div>
         <p className="text-[11.5px] font-semibold leading-tight">New order #{number}</p>
-        <p className="text-[10.5px] text-ink-500">{total} · 2 items · paid</p>
+        <p className="text-[10.5px] text-ink-700">{total} · 2 items · paid</p>
       </div>
     </div>
   );
