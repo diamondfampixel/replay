@@ -11,6 +11,43 @@ export type NavItem = {
 
 export type NavGroup = { label?: string; items: NavItem[] };
 
+/** Settings sub-navigation, shared by the settings nav component and the
+ *  route-existence test so both stay in lockstep with the real pages. */
+export const SETTINGS_NAV: NavGroup[] = [
+  {
+    label: "Store",
+    items: [
+      { label: "General", href: "/admin/settings", icon: "Settings" },
+      { label: "Brand", href: "/admin/settings/brand", icon: "Palette" },
+      { label: "Domain", href: "/admin/settings/domain", icon: "Globe" },
+    ],
+  },
+  {
+    label: "Commerce",
+    items: [
+      { label: "Payments", href: "/admin/settings/payments", icon: "CreditCard" },
+      { label: "Shipping", href: "/admin/settings/shipping", icon: "Truck" },
+      { label: "Taxes", href: "/admin/settings/taxes", icon: "Receipt" },
+    ],
+  },
+  {
+    label: "Platform",
+    items: [
+      { label: "Notifications", href: "/admin/settings/notifications", icon: "Bell" },
+      { label: "AI assistant", href: "/admin/settings/ai", icon: "Sparkles" },
+      { label: "Users & roles", href: "/admin/settings/team", icon: "Users", capability: "team:manage" },
+      { label: "Data", href: "/admin/settings/data", icon: "Database" },
+    ],
+  },
+  {
+    label: "Account",
+    items: [
+      { label: "Plan & billing", href: "/admin/settings/billing", icon: "CreditCard", capability: "billing:manage" },
+      { label: "Your profile", href: "/admin/settings/profile", icon: "User" },
+    ],
+  },
+];
+
 export const ADMIN_NAV: NavGroup[] = [
   {
     items: [
