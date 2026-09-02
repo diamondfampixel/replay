@@ -2,11 +2,17 @@ import { prisma } from "@/lib/db";
 import { requireContext } from "@/lib/session";
 import { AdminShell } from "@/components/admin/shell";
 import { isAIConfigured } from "@/lib/ai/config";
+import { VerifyEmailBanner } from "@/components/admin/verify-banner";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireContext();
+
+  const account = await prisma.user.findUniqueOrThrow({
+    where: { id: ctx.user.id },
+    select: { emailVerifiedAt: true },
+  });
 
   const [notifications, aiConfigured] = await Promise.all([
     prisma.notification.findMany({
@@ -35,6 +41,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         createdAt: n.createdAt.toISOString(),
       }))}
     >
+      {!account.emailVerifiedAt && <VerifyEmailBanner email={ctx.user.email} />}
       {children}
     </AdminShell>
   );

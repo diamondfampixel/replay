@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { apiContext, clientErrorMessage } from "@/lib/services/context";
+import { reportError } from "@/lib/monitoring";
 import { cancelPendingAction, confirmPendingAction, undoAction } from "@/lib/ai/executor";
 
 export const runtime = "nodejs";
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   } catch (error) {
-    console.error("[api/ai/confirm]", error);
+    reportError("api/ai/confirm", error);
     const message = clientErrorMessage(error, "Could not complete that.");
     return NextResponse.json({ status: "failed", error: message }, { status: 400 });
   }

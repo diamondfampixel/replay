@@ -124,7 +124,7 @@ export async function subscribeAction(storeSlug: string, formData: FormData, ses
   return guard(async () => {
     const headerList = await headers();
     const ip = headerList.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
-    const limit = rateLimit(`subscribe:${ip}`, { limit: 10, windowMs: 60 * 60_000 });
+    const limit = await rateLimit(`subscribe:${ip}`, { limit: 10, windowMs: 60 * 60_000 });
     if (!limit.ok) return fail("Too many signups from this connection. Try again later.");
 
     const parsed = newsletterSchema.safeParse({
@@ -175,7 +175,7 @@ export async function checkoutAction(storeSlug: string, payload: unknown, sessio
     const headerList = await headers();
     const ip = headerList.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
 
-    const limit = rateLimit(`checkout:${ip}`, { limit: 20, windowMs: 10 * 60_000 });
+    const limit = await rateLimit(`checkout:${ip}`, { limit: 20, windowMs: 10 * 60_000 });
     if (!limit.ok) return fail("Too many checkout attempts. Please wait a moment.");
 
     const parsed = checkoutSchema.safeParse(payload);

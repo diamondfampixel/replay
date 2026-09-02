@@ -158,3 +158,47 @@ afterAll(async () => {
     data: { passwordHash: await hashPassword("password123") },
   });
 });
+
+describe("email verification", () => {
+  it("confirms the account with a genuine token, exactly once", async () => {
+    const { verifyEmailToken } = await import("@/lib/services/verification");
+    const token = randomBytes(24).toString("base64url");
+    await testDb.user.update({ where: { id: userId }, data: { emailVerifiedAt: null } });
+    await testDb.emailVerificationToken.create({
+      data: { userId, token: hashToken(token), expiresAt: new Date(Date.now() + 60_000) },
+    });
+
+    expect(await verifyEmailToken(token)).toBe(true);
+    const user = await testDb.user.findUniqueOrThrow({ where: { id: userId } });
+    expect(user.emailVerifiedAt).not.toBeNull();
+
+    // Replay of the same token fails.
+    expect(await verifyEmailToken(token)).toBe(false);
+  });
+
+  it("rejects expired and invented tokens", async () => {
+    const { verifyEmailToken } = await import("@/lib/services/verification");
+    const stale = randomBytes(24).toString("base64url");
+    await testDb.emailVerificationToken.create({
+      data: { userId, token: hashToken(stale), expiresAt: new Date(Date.now() - 1000) },
+    });
+    expect(await verifyEmailToken(stale)).toBe(false);
+    expect(await verifyEmailToken("not-a-real-token")).toBe(false);
+  });
+
+  it("signup verifies immediately when no platform email exists to send with", async () => {
+    const { signupAction } = await import("@/app/actions/auth");
+    const form = new FormData();
+    const email = `verify-${Date.now()}@example.test`;
+    form.set("name", "Verify Test");
+    form.set("email", email);
+    form.set("password", "a-password-123");
+    const result = await signupAction(form);
+    expect(result.ok).toBe(true);
+
+    const user = await testDb.user.findUniqueOrThrow({ where: { email } });
+    expect(user.emailVerifiedAt).not.toBeNull();
+    await testDb.session.deleteMany({ where: { userId: user.id } });
+    await testDb.user.delete({ where: { id: user.id } });
+  });
+});

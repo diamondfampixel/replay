@@ -20,6 +20,10 @@ model User {
   name         String
   passwordHash String
   avatarUrl    String?
+  // Null until the address is confirmed. Accounts created while no platform
+  // email provider is configured are verified on creation — there is no way
+  // to send the link, and blocking every dev signup would be theatre.
+  emailVerifiedAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -29,6 +33,18 @@ model User {
   auditLogs       AuditLog[]
   passwordResets  PasswordResetToken[]
   notifications   Notification[]
+  emailVerifications EmailVerificationToken[]
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Session {

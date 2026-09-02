@@ -12,6 +12,7 @@ import {
 } from "@/lib/ai/conversation";
 import { apiContext, clientErrorMessage, ValidationError } from "@/lib/services/context";
 import { assertAIWithinBudget, recordAIUsage } from "@/lib/services/billing";
+import { reportError } from "@/lib/monitoring";
 import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
   const ctx = await apiContext({ actor: "ai" });
   if (!ctx) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
-  const limit = rateLimit(`ai:${ctx.userId}`, { limit: 40, windowMs: 5 * 60_000 });
+  const limit = await rateLimit(`ai:${ctx.userId}`, { limit: 40, windowMs: 5 * 60_000 });
   if (!limit.ok) {
     return NextResponse.json(
       { error: `Too many requests. Try again in ${limit.retryAfterSeconds}s.` },
@@ -289,7 +290,7 @@ export async function POST(request: Request) {
         await touchConversation(conversation.id);
         send("done", { conversationId: conversation.id });
       } catch (error) {
-        console.error("[api/ai/chat]", error);
+        reportError("api/ai/chat", error, { storeId: ctx.storeId });
         const message =
           providerErrorMessage(error) ??
           clientErrorMessage(error, "The assistant could not complete that request.");

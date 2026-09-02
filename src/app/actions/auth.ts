@@ -17,6 +17,10 @@ import {
   signupSchema,
 } from "@/lib/validation/auth";
 import { fail, fromZodError, guard, ok, type ActionResult } from "@/lib/action-result";
+import { sendVerification } from "@/lib/services/verification";
+import {
+  isPlatformEmailConfigured, passwordResetEmail, sendPlatformEmail,
+} from "@/lib/platform-email";
 import { rateLimit } from "@/lib/rate-limit";
 
 async function requestMeta() {
@@ -30,7 +34,7 @@ async function requestMeta() {
 export async function signupAction(formData: FormData): Promise<ActionResult<{ redirect: string }>> {
   return guard(async () => {
     const meta = await requestMeta();
-    const limit = rateLimit(`signup:${meta.ip}`, { limit: 10, windowMs: 60 * 60_000 });
+    const limit = await rateLimit(`signup:${meta.ip}`, { limit: 10, windowMs: 60 * 60_000 });
     if (!limit.ok) return fail("Too many attempts. Please try again later.");
 
     const parsed = signupSchema.safeParse({
@@ -55,6 +59,16 @@ export async function signupAction(formData: FormData): Promise<ActionResult<{ r
       },
     });
 
+    // With no platform email provider there is no way to deliver the link, so
+    // the account verifies on creation rather than being stuck forever.
+    const verification = await sendVerification(user);
+    if (verification === "not-configured") {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerifiedAt: new Date() },
+      });
+    }
+
     await createSession(user.id, meta);
     return ok({ redirect: "/onboarding" });
   });
@@ -63,7 +77,7 @@ export async function signupAction(formData: FormData): Promise<ActionResult<{ r
 export async function loginAction(formData: FormData): Promise<ActionResult<{ redirect: string }>> {
   return guard(async () => {
     const meta = await requestMeta();
-    const limit = rateLimit(`login:${meta.ip}`, { limit: 20, windowMs: 15 * 60_000 });
+    const limit = await rateLimit(`login:${meta.ip}`, { limit: 20, windowMs: 15 * 60_000 });
     if (!limit.ok) {
       return fail(`Too many sign-in attempts. Try again in ${limit.retryAfterSeconds}s.`);
     }
@@ -95,7 +109,7 @@ export async function forgotPasswordAction(
 ): Promise<ActionResult<{ devToken?: string }>> {
   return guard(async () => {
     const meta = await requestMeta();
-    const limit = rateLimit(`forgot:${meta.ip}`, { limit: 5, windowMs: 15 * 60_000 });
+    const limit = await rateLimit(`forgot:${meta.ip}`, { limit: 5, windowMs: 15 * 60_000 });
     if (!limit.ok) return fail("Too many requests. Please try again later.");
 
     const parsed = forgotPasswordSchema.safeParse({ email: formData.get("email") });
@@ -114,10 +128,18 @@ export async function forgotPasswordAction(
       },
     });
 
-    // No email provider is configured by default. In development we surface the
-    // link directly so the flow is genuinely testable; in production this is
-    // withheld until an email integration is connected.
-    if (process.env.NODE_ENV !== "production" && !process.env.RESEND_API_KEY) {
+    if (isPlatformEmailConfigured()) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+      const email = passwordResetEmail(`${appUrl}/reset-password?token=${token}`);
+      await sendPlatformEmail({ to: user.email, ...email });
+      return ok({});
+    }
+
+    // No email provider is configured. In development we surface the link
+    // directly so the flow is genuinely testable; in production it is
+    // withheld — a reset link nobody can receive should not exist in a
+    // response body.
+    if (process.env.NODE_ENV !== "production") {
       return ok({ devToken: token });
     }
     return ok({});
@@ -158,4 +180,21 @@ export async function resetPasswordAction(formData: FormData): Promise<ActionRes
 
 export async function currentUserAction() {
   return getSessionUser();
+}
+
+export async function resendVerificationAction(): Promise<ActionResult<null>> {
+  return guard(async () => {
+    const user = await getSessionUser();
+    if (!user) return fail("Sign in first.");
+
+    const limit = await rateLimit(`verify:${user.id}`, { limit: 3, windowMs: 15 * 60_000 });
+    if (!limit.ok) return fail("A link was just sent. Check your inbox, and spam, before requesting another.");
+
+    const record = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    if (record.emailVerifiedAt) return ok(null, "Your email is already confirmed.");
+
+    const outcome = await sendVerification(record);
+    if (outcome === "sent") return ok(null, `Confirmation link sent to ${record.email}`);
+    return fail("The email could not be sent right now. Try again in a few minutes.");
+  });
 }

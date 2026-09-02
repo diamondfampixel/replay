@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     throw error;
   }
 
-  const limit = rateLimit(`variants:${ctx.userId}`, { limit: 20, windowMs: 5 * 60_000 });
+  const limit = await rateLimit(`variants:${ctx.userId}`, { limit: 20, windowMs: 5 * 60_000 });
   if (!limit.ok) return NextResponse.json({ error: "Too many requests." }, { status: 429 });
 
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));

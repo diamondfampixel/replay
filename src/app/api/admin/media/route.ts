@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { apiContext } from "@/lib/services/context";
 import { listMedia, uploadMedia } from "@/lib/services/media";
 import { rateLimit } from "@/lib/rate-limit";
+import { reportError } from "@/lib/monitoring";
 import { AuthorizationError } from "@/lib/permissions";
 import { ValidationError } from "@/lib/services/context";
 
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
   const ctx = await apiContext();
   if (!ctx) return unauthorized();
   try {
-    const limit = rateLimit(`media:${ctx.storeId}`, { limit: 60, windowMs: 60_000 });
+    const limit = await rateLimit(`media:${ctx.storeId}`, { limit: 60, windowMs: 60_000 });
     if (!limit.ok) {
       return NextResponse.json({ error: "Too many uploads. Try again shortly." }, { status: 429 });
     }
@@ -61,6 +62,6 @@ function errorResponse(error: unknown) {
   }
   // Log the detail server-side but never echo it back: the raw message can
   // carry query fragments, file paths, or driver internals.
-  console.error("[api/media]", error);
+  reportError("api/media", error);
   return NextResponse.json({ error: "Upload failed" }, { status: 500 });
 }

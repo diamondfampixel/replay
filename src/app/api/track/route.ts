@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { EVENT_TYPES, classifyDevice, trackEvent } from "@/lib/services/events";
 import { filterValidAssignments, recordExperimentEvent } from "@/lib/services/experiments";
 import { rateLimit } from "@/lib/rate-limit";
+import { reportError } from "@/lib/monitoring";
 
 export const runtime = "nodejs";
 
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
   }
   const body = parsed.data;
 
-  const limit = rateLimit(`track:${body.sessionId}`, { limit: 120, windowMs: 60_000 });
+  const limit = await rateLimit(`track:${body.sessionId}`, { limit: 120, windowMs: 60_000 });
   if (!limit.ok) return NextResponse.json({ ok: true, throttled: true });
 
   const store = await prisma.store.findUnique({
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
       });
     }
   } catch (error) {
-    console.error("[api/track]", error);
+    reportError("api/track", error);
     // Never let analytics failures surface to a shopper.
     return NextResponse.json({ ok: false });
   }

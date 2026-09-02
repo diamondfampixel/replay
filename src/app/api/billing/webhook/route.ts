@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { prisma } from "@/lib/db";
+import { reportError } from "@/lib/monitoring";
 import { getStripe, isStripeBillingConfigured, planFromLookupKey } from "@/lib/stripe";
 
 export const runtime = "nodejs";
@@ -105,7 +106,7 @@ export async function POST(request: Request) {
         break;
     }
   } catch (error) {
-    console.error("[billing/webhook]", event.type, error);
+    reportError("billing/webhook", error, { eventType: event.type });
     // 500 makes Stripe retry, which is what we want for a transient DB fault.
     return NextResponse.json({ error: "Handler failed" }, { status: 500 });
   }
