@@ -9,6 +9,8 @@ import { fail, fromZodError, guard, ok } from "@/lib/action-result";
 import { assertCanAddTeamMember } from "@/lib/services/billing";
 import { assertCan } from "@/lib/permissions";
 import { hashPassword, verifyPassword } from "@/lib/auth";
+import { storeThemeSchema } from "@/lib/storefront/theme";
+import { applyStoreTheme } from "@/lib/storefront/design";
 import type { Role } from "@/generated/prisma/client";
 
 const generalSchema = z.object({
@@ -70,6 +72,26 @@ export async function updateBrandSettingsAction(input: unknown) {
     revalidatePath("/admin/settings/brand");
     revalidatePath(`/s/${store.slug}`, "layout");
     return ok(null, "Brand saved");
+  });
+}
+
+export async function updateDesignSettingsAction(input: unknown) {
+  return guard(async () => {
+    const ctx = await serviceContext();
+    assertCan(ctx.role, "settings:write");
+    const parsed = storeThemeSchema.partial().safeParse(input);
+    if (!parsed.success) return fromZodError(parsed.error);
+
+    const next = await applyStoreTheme(ctx.storeId, parsed.data);
+    await audit(ctx, "settings.design", { type: "Store", id: ctx.storeId }, { direction: next.direction });
+
+    const store = await prisma.store.findUniqueOrThrow({
+      where: { id: ctx.storeId },
+      select: { slug: true },
+    });
+    revalidatePath("/admin/settings/design");
+    revalidatePath(`/s/${store.slug}`, "layout");
+    return ok(next, "Design saved");
   });
 }
 

@@ -207,3 +207,124 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .thinking-dots span { animation: none; opacity: 0.6; }
 }
+
+/* ==========================================================================
+   Storefront design system.
+   The `--st-*` custom properties are set per store on `.st-root` (see
+   src/lib/storefront/theme.ts). Components read these tokens instead of
+   hard-coded values, so two stores on different design directions render as
+   genuinely different sites, not one template recoloured.
+   ========================================================================== */
+.st-root {
+  background: var(--st-bg, #ffffff);
+  color: var(--st-fg, #111111);
+  font-family: var(--st-font-body, system-ui, sans-serif);
+}
+.st-root h1, .st-root h2, .st-root h3,
+.st-root .st-display {
+  font-family: var(--st-font-display, var(--st-font-body, system-ui, sans-serif));
+  font-weight: var(--st-heading-weight, 600);
+  letter-spacing: var(--st-heading-spacing, -0.02em);
+  text-wrap: balance;
+}
+.st-root .st-eyebrow,
+.st-root .st-heading-transform {
+  text-transform: var(--st-heading-transform, none);
+}
+.st-root .st-muted { color: var(--st-muted-fg, #6b6b6b); }
+.st-root .st-surface {
+  background: var(--st-surface, #ffffff);
+  border-color: var(--st-border, #e5e5e1);
+}
+
+/* Buttons — filled/outline/soft resolved into tokens by the theme. */
+.st-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 0.4rem; height: 2.9rem; padding: 0 1.5rem;
+  font-size: 0.9rem; font-weight: 600; line-height: 1;
+  border-radius: var(--st-radius-button, 8px);
+  background: var(--st-btn-bg, #111);
+  color: var(--st-btn-fg, #fff);
+  border: 1px solid var(--st-btn-border, var(--st-btn-bg, #111));
+  transition: transform 0.18s ease, filter 0.18s ease, background 0.18s ease;
+  cursor: pointer;
+}
+.st-btn:hover { filter: brightness(1.06); }
+.st-btn-secondary {
+  background: transparent;
+  color: var(--st-fg, #111);
+  border: 1px solid var(--st-border-strong, #c9c9c4);
+}
+.st-btn-secondary:hover { background: var(--st-surface-alt, rgba(0,0,0,0.04)); filter: none; }
+.st-btn-sm { height: 2.5rem; padding: 0 1.15rem; font-size: 0.83rem; }
+
+/* Surfaces that carry the theme radius. */
+.st-radius { border-radius: var(--st-radius, 10px); }
+.st-radius-sm { border-radius: var(--st-radius-sm, 6px); }
+
+/* Product media respects the store's chosen aspect ratio. */
+.st-product-media { aspect-ratio: var(--st-image-ratio, 1 / 1); }
+
+/* Motion: reveal-on-load for storefront sections, gated on the theme's motion
+   level and always disabled under reduced-motion. Sections render visible by
+   default (SSR/no-JS safe); the class only adds an entrance where enabled. */
+[data-motion="expressive"] .st-reveal,
+[data-motion="subtle"] .st-reveal {
+  animation: st-reveal 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+[data-motion="expressive"] .st-reveal { animation-duration: 0.7s; }
+@keyframes st-reveal {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+[data-motion="none"] .st-reveal { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .st-reveal { animation: none !important; }
+}
+
+/* Card hover lift, only where the theme opts into richer motion. */
+[data-motion="expressive"] .st-card-hover {
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+[data-motion="expressive"] .st-card-hover:hover {
+  transform: translateY(-3px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .st-card-hover { transition: none; }
+  .st-card-hover:hover { transform: none; }
+}
+
+/* Product-card treatments — set by `data-card` on the storefront root. */
+[data-card="framed"] .st-product-card {
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius);
+  overflow: hidden;
+}
+[data-card="framed"] .st-product-card .st-product-media { border-radius: 0; }
+[data-card="framed"] .st-product-body { padding: 0.8rem 0.95rem 1rem; margin-top: 0; }
+[data-card="elevated"] .st-product-card {
+  background: var(--st-surface);
+  border-radius: var(--st-radius);
+  box-shadow: 0 1px 2px rgba(16, 16, 14, 0.05), 0 10px 30px -16px rgba(16, 16, 14, 0.25);
+  overflow: hidden;
+}
+[data-card="elevated"] .st-product-card .st-product-media { border-radius: 0; }
+[data-card="elevated"] .st-product-body { padding: 0.85rem 1.05rem 1.15rem; margin-top: 0; }
+[data-card="editorial"] .st-product-body { margin-top: 1.1rem; }
+[data-card="editorial"] .st-product-card h3 {
+  font-family: var(--st-font-display, inherit);
+  font-weight: var(--st-heading-weight, 600);
+}
+
+/* Header link colour + header-style variants (set by `data-header`). */
+.st-header-link { color: var(--st-muted-fg); }
+.st-header-link:hover { background: var(--st-surface-alt); }
+[data-header="centered"] .st-header-inner { position: relative; }
+[data-header="centered"] .st-wordmark-link {
+  position: absolute; left: 50%; transform: translateX(-50%);
+}
+[data-header="centered"] .st-header-nav { margin-left: 0; }
+[data-header="minimal"] .st-header-nav { display: none; }
+@media (min-width: 640px) {
+  [data-header="minimal"] .st-header-nav { display: none; }
+}

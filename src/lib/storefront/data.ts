@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getPlan } from "@/lib/plans";
 import { getActiveContext } from "@/lib/session";
+import { resolveTheme, type ResolvedTheme } from "@/lib/storefront/theme";
 import { toNumber } from "@/lib/money";
 import { getCollectionProducts } from "@/lib/services/collections";
 
@@ -21,6 +22,8 @@ export type StorefrontStore = {
   isDemo: boolean;
   /** Free-plan storefronts carry a small credit; paid plans remove it. */
   showHalyardCredit: boolean;
+  /** Resolved design system (direction preset + per-store overrides). */
+  theme: ResolvedTheme;
   nav: Array<{ label: string; href: string }>;
   footerNav: Array<{ label: string; href: string }>;
 };
@@ -57,6 +60,7 @@ export const getStore = cache(async (slug: string): Promise<StorefrontStore> => 
     contactEmail: store.contactEmail,
     isDemo: store.isDemo,
     showHalyardCredit: getPlan(store.organization.plan).limits.halyardBranding,
+    theme: resolveTheme({ theme: store.theme, primaryColor: store.primaryColor, secondaryColor: store.secondaryColor }),
     nav: store.navigationItems.filter((item) => item.group === "main").map((item) => ({ label: item.label, href: item.href })),
     footerNav: store.navigationItems.filter((item) => item.group === "footer").map((item) => ({ label: item.label, href: item.href })),
   };

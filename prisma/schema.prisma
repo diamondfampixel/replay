@@ -182,6 +182,10 @@ model Store {
   fontHeading    String  @default("Inter")
   fontBody       String  @default("Inter")
 
+  // Structured storefront design system (see src/lib/storefront/theme.ts).
+  // A direction preset plus optional per-token overrides; null = defaults.
+  theme          Json?
+
   // commerce config
   currency     String  @default("USD")
   timezone     String  @default("America/New_York")

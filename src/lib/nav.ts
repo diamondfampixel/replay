@@ -19,6 +19,7 @@ export const SETTINGS_NAV: NavGroup[] = [
     items: [
       { label: "General", href: "/admin/settings", icon: "Settings" },
       { label: "Brand", href: "/admin/settings/brand", icon: "Palette" },
+      { label: "Design", href: "/admin/settings/design", icon: "Wand2" },
       { label: "Domain", href: "/admin/settings/domain", icon: "Globe" },
     ],
   },

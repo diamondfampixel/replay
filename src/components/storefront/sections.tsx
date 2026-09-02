@@ -53,41 +53,51 @@ export async function SectionRenderer({
 
     case "hero": {
       const heights: Record<string, string> = {
-        small: "py-14 sm:py-16",
-        medium: "py-20 sm:py-28",
-        large: "py-24 sm:py-36",
+        small: "py-16 sm:py-20",
+        medium: "py-24 sm:py-32",
+        large: "py-28 sm:py-44",
       };
-      const backgrounds: Record<string, string> = {
-        white: "bg-white text-ink-900",
-        muted: "bg-ink-100 text-ink-900",
-        brand: "bg-[var(--store-primary)] text-white",
+      const styles: Record<string, React.CSSProperties> = {
+        white: { background: "var(--st-bg)", color: "var(--st-fg)" },
+        muted: { background: "var(--st-surface-alt)", color: "var(--st-fg)" },
+        brand: { background: "var(--st-accent)", color: "var(--st-accent-fg)" },
       };
       const centered = config.align === "center";
+      const hasImage = Boolean(config.imageUrl);
       return (
-        <section className={cn("relative overflow-hidden", backgrounds[config.background] ?? backgrounds.muted, heights[config.height] ?? heights.large)}>
+        <section
+          className={cn("st-reveal relative overflow-hidden", heights[config.height] ?? heights.large)}
+          style={styles[config.background] ?? styles.muted}
+        >
           {config.imageUrl && (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={config.imageUrl} alt="" className="absolute inset-0 size-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-r from-white/92 via-white/70 to-white/10" />
+              <div
+                className="absolute inset-0"
+                style={{
+                  background: centered
+                    ? "linear-gradient(to top, rgba(10,10,10,0.62), rgba(10,10,10,0.22))"
+                    : "linear-gradient(to right, rgba(10,10,10,0.68), rgba(10,10,10,0.25) 55%, transparent)",
+                }}
+              />
             </>
           )}
-          <div className={cn("relative mx-auto max-w-6xl px-5", centered && "text-center")}>
-            <h1 className={cn("max-w-2xl text-[32px] font-semibold leading-[1.08] tracking-[-0.025em] sm:text-[46px]", centered && "mx-auto")}>
+          <div className={cn("relative mx-auto max-w-6xl px-5", centered && "text-center")} style={hasImage ? { color: "#fff" } : undefined}>
+            <h1
+              className={cn("st-display max-w-3xl text-[34px] leading-[1.05] sm:text-[54px]", centered && "mx-auto")}
+              style={{ letterSpacing: "var(--st-heading-spacing)", textTransform: "var(--st-heading-transform)" as React.CSSProperties["textTransform"] }}
+            >
               {config.headline}
             </h1>
             {config.subheadline && (
-              <p className={cn("mt-4 max-w-xl text-[15.5px] leading-relaxed opacity-75", centered && "mx-auto")}>
+              <p className={cn("mt-5 max-w-xl text-[16px] leading-relaxed", centered && "mx-auto", !hasImage && "st-muted")} style={hasImage ? { opacity: 0.92 } : undefined}>
                 {config.subheadline}
               </p>
             )}
-            <div className={cn("mt-7 flex flex-wrap gap-3", centered && "justify-center")}>
+            <div className={cn("mt-8 flex flex-wrap gap-3", centered && "justify-center")}>
               {config.ctaLabel && (
-                <StoreLink
-                  href={config.ctaHref || "/shop"}
-                  storeSlug={s}
-                  className="inline-flex h-11 items-center rounded-md bg-ink-900 px-6 text-[14px] font-medium text-white transition-colors hover:bg-ink-800"
-                >
+                <StoreLink href={config.ctaHref || "/shop"} storeSlug={s} className="st-btn">
                   {config.ctaLabel}
                 </StoreLink>
               )}
@@ -95,7 +105,8 @@ export async function SectionRenderer({
                 <StoreLink
                   href={config.secondaryCtaHref || "/pages/about"}
                   storeSlug={s}
-                  className="inline-flex h-11 items-center rounded-md border border-ink-300 bg-white/80 px-6 text-[14px] font-medium text-ink-800 transition-colors hover:bg-white"
+                  className={cn("st-btn st-btn-secondary")}
+                  style={hasImage ? { color: "#fff", borderColor: "rgba(255,255,255,0.6)" } : undefined}
                 >
                   {config.secondaryCtaLabel}
                 </StoreLink>
@@ -108,27 +119,31 @@ export async function SectionRenderer({
 
     case "imageHero":
       return (
-        <section className="relative min-h-[380px] overflow-hidden bg-ink-900 sm:min-h-[520px]">
+        <section className="st-reveal relative min-h-[420px] overflow-hidden sm:min-h-[560px]" style={{ background: "var(--st-contrast-bg)" }}>
           {config.imageUrl && (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img src={config.imageUrl} alt="" className="absolute inset-0 size-full object-cover" />
           )}
-          <div className="absolute inset-0 bg-ink-950" style={{ opacity: (Number(config.overlay) || 30) / 100 }} />
+          <div className="absolute inset-0 bg-black" style={{ opacity: (Number(config.overlay) || 30) / 100 }} />
           <div
             className={cn(
-              "relative mx-auto flex min-h-[380px] max-w-6xl flex-col justify-center px-5 py-16 text-white sm:min-h-[520px]",
+              "relative mx-auto flex min-h-[420px] max-w-6xl flex-col justify-center px-5 py-16 text-white sm:min-h-[560px]",
               config.align === "center" && "items-center text-center",
             )}
           >
-            <h2 className="max-w-2xl text-[30px] font-semibold leading-tight tracking-[-0.02em] sm:text-[42px]">
+            <h2
+              className="st-display max-w-2xl text-[32px] leading-[1.06] sm:text-[48px]"
+              style={{ letterSpacing: "var(--st-heading-spacing)", textTransform: "var(--st-heading-transform)" as React.CSSProperties["textTransform"] }}
+            >
               {config.headline}
             </h2>
-            {config.subheadline && <p className="mt-3 max-w-lg text-[15px] opacity-85">{config.subheadline}</p>}
+            {config.subheadline && <p className="mt-4 max-w-lg text-[16px] opacity-90">{config.subheadline}</p>}
             {config.ctaLabel && (
               <StoreLink
                 href={config.ctaHref || "/shop"}
                 storeSlug={s}
-                className="mt-6 inline-flex h-11 w-fit items-center rounded-md bg-white px-6 text-[14px] font-medium text-ink-900 hover:bg-ink-100"
+                className="st-btn mt-7 w-fit"
+                style={{ background: "#fff", color: "#111", borderColor: "#fff" }}
               >
                 {config.ctaLabel}
               </StoreLink>
@@ -232,20 +247,16 @@ export async function SectionRenderer({
           <div className={cn("grid items-center gap-8 lg:grid-cols-2", config.imagePosition === "left" && "lg:[&>*:first-child]:order-2")}>
             <div>
               {config.heading && (
-                <h2 className="text-[22px] font-semibold tracking-[-0.02em] sm:text-[26px]">{config.heading}</h2>
+                <h2 className="st-heading-transform text-[24px] leading-[1.1] sm:text-[30px]">{config.heading}</h2>
               )}
-              <p className="mt-3 whitespace-pre-line text-[15px] leading-relaxed opacity-80">{config.body}</p>
+              <p className="st-muted mt-4 whitespace-pre-line text-[15.5px] leading-relaxed">{config.body}</p>
               {config.ctaLabel && (
-                <StoreLink
-                  href={config.ctaHref || "/shop"}
-                  storeSlug={s}
-                  className="mt-5 inline-flex h-10 items-center rounded-md border border-ink-300 px-5 text-[13.5px] font-medium hover:bg-ink-50"
-                >
+                <StoreLink href={config.ctaHref || "/shop"} storeSlug={s} className="st-btn st-btn-secondary st-btn-sm mt-6">
                   {config.ctaLabel}
                 </StoreLink>
               )}
             </div>
-            <div className="aspect-[4/3] overflow-hidden rounded-md bg-ink-100">
+            <div className="st-product-media st-radius overflow-hidden" style={{ background: "var(--st-surface-alt)", aspectRatio: "4 / 3" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={config.imageUrl ?? "/placeholder.svg"} alt="" loading="lazy" className="size-full object-cover" />
             </div>
@@ -361,17 +372,13 @@ export async function SectionRenderer({
     case "customBanner":
       return (
         <SectionShell background={config.background} spacing={config.spacing}>
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-md border border-current/15 px-6 py-6">
+          <div className="st-radius flex flex-wrap items-center justify-between gap-4 border border-current/15 px-7 py-7">
             <div>
-              <h2 className="text-[19px] font-semibold tracking-[-0.015em]">{config.heading}</h2>
-              {config.body && <p className="mt-1 text-[14px] opacity-70">{config.body}</p>}
+              <h2 className="st-heading-transform text-[20px] leading-tight">{config.heading}</h2>
+              {config.body && <p className="st-muted mt-1.5 text-[14.5px]">{config.body}</p>}
             </div>
             {config.ctaLabel && (
-              <StoreLink
-                href={config.ctaHref || "/shop"}
-                storeSlug={s}
-                className="inline-flex h-10 items-center rounded-md bg-ink-900 px-5 text-[13.5px] font-medium text-white hover:bg-ink-800"
-              >
+              <StoreLink href={config.ctaHref || "/shop"} storeSlug={s} className="st-btn st-btn-sm">
                 {config.ctaLabel}
               </StoreLink>
             )}

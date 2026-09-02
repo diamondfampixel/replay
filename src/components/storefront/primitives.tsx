@@ -65,14 +65,14 @@ export function ProductCard({
   currency: string;
 }) {
   return (
-    <StoreLink href={`/products/${product.slug}`} storeSlug={storeSlug} className="group block">
-      <div className="relative aspect-square overflow-hidden rounded-md bg-ink-100">
+    <StoreLink href={`/products/${product.slug}`} storeSlug={storeSlug} className="st-product-card st-card-hover group block">
+      <div className="st-product-media st-radius relative overflow-hidden" style={{ background: "var(--st-surface-alt)" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={product.imageUrl ?? "/placeholder.svg"}
           alt={product.title}
           loading="lazy"
-          className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+          className="size-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
         />
         {product.secondaryImageUrl && (
           /* eslint-disable-next-line @next/next/no-img-element */
@@ -81,28 +81,28 @@ export function ProductCard({
             alt=""
             loading="lazy"
             aria-hidden="true"
-            className="absolute inset-0 size-full object-cover opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+            className="absolute inset-0 size-full object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100"
           />
         )}
         {!product.inStock && (
-          <span className="absolute left-2 top-2 rounded bg-white/95 px-2 py-0.5 text-[11px] font-medium text-ink-700">
+          <span className="st-radius-sm absolute left-2 top-2 bg-white/95 px-2 py-0.5 text-[11px] font-medium text-ink-700">
             Sold out
           </span>
         )}
         {product.compareAtPrice != null && product.compareAtPrice > product.price && product.inStock && (
-          <span className="absolute left-2 top-2 rounded bg-[var(--color-signal-negative)] px-2 py-0.5 text-[11px] font-medium text-white">
+          <span className="st-radius-sm absolute left-2 top-2 px-2 py-0.5 text-[11px] font-medium text-white" style={{ background: "var(--color-signal-negative)" }}>
             Sale
           </span>
         )}
       </div>
-      <div className="mt-2.5">
-        <h3 className="text-[13.5px] font-medium leading-snug text-ink-900 group-hover:underline">
+      <div className="st-product-body mt-3">
+        <h3 className="text-[14px] font-medium leading-snug group-hover:underline" style={{ color: "var(--st-fg)" }}>
           {product.title}
         </h3>
         <div className="mt-1 flex items-center gap-2">
-          <Price price={product.price} compareAtPrice={product.compareAtPrice} currency={currency} className="text-[13px] text-ink-700" />
+          <Price price={product.price} compareAtPrice={product.compareAtPrice} currency={currency} className="st-muted text-[13.5px]" />
           {product.reviewCount > 0 && product.rating !== null && (
-            <span className="flex items-center gap-1 text-[11.5px] text-ink-400">
+            <span className="st-muted flex items-center gap-1 text-[11.5px]">
               <Stars rating={product.rating} size={10} />
               ({product.reviewCount})
             </span>
@@ -124,19 +124,25 @@ export function SectionShell({
   className?: string;
   children: React.ReactNode;
 }) {
-  const backgrounds: Record<string, string> = {
-    white: "bg-white text-ink-900",
-    muted: "bg-ink-50 text-ink-900",
-    brand: "bg-[var(--store-primary)] text-white",
-    ink: "bg-ink-900 text-white",
+  // Background roles resolve to theme tokens so a section reads correctly on
+  // every design direction (a "muted" band on a warm store is warm, not grey).
+  const styles: Record<string, React.CSSProperties> = {
+    white: { background: "var(--st-bg)", color: "var(--st-fg)" },
+    muted: { background: "var(--st-surface-alt)", color: "var(--st-fg)" },
+    brand: { background: "var(--st-accent)", color: "var(--st-accent-fg)" },
+    ink: { background: "var(--st-contrast-bg)", color: "var(--st-contrast-fg)" },
   };
-  const spacings: Record<string, string> = {
-    compact: "py-8 sm:py-10",
-    normal: "py-12 sm:py-16",
-    roomy: "py-16 sm:py-24",
+  // Density scales with the theme; the enum nudges it up or down a step.
+  const pad: Record<string, string> = {
+    compact: "clamp(2rem, calc(var(--st-section-gap) * 0.7), 4rem)",
+    normal: "var(--st-section-gap)",
+    roomy: "var(--st-section-gap-sm)",
   };
   return (
-    <section className={cn(backgrounds[background] ?? backgrounds.white, spacings[spacing] ?? spacings.normal, className)}>
+    <section
+      className={cn("st-reveal", className)}
+      style={{ ...(styles[background] ?? styles.white), paddingTop: pad[spacing] ?? pad.normal, paddingBottom: pad[spacing] ?? pad.normal }}
+    >
       <div className="mx-auto max-w-6xl px-5">{children}</div>
     </section>
   );
@@ -152,11 +158,11 @@ export function SectionHeading({
 }) {
   if (!title && !subtitle) return null;
   return (
-    <div className={cn("mb-7", align === "center" && "text-center", className)}>
+    <div className={cn("mb-8", align === "center" && "text-center", className)}>
       {title && (
-        <h2 className="text-[22px] font-semibold tracking-[-0.02em] sm:text-[26px]">{title}</h2>
+        <h2 className="st-heading-transform text-[24px] leading-[1.1] sm:text-[30px]">{title}</h2>
       )}
-      {subtitle && <p className="mt-1.5 text-[14.5px] opacity-70">{subtitle}</p>}
+      {subtitle && <p className="st-muted mt-2 text-[15px]">{subtitle}</p>}
     </div>
   );
 }
