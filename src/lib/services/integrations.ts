@@ -2,6 +2,8 @@ import "server-only";
 import { prisma, type Prisma } from "@/lib/db";
 import { audit, authorize, ValidationError, type ServiceContext } from "@/lib/services/context";
 import { INTEGRATION_CATALOG, getIntegration } from "@/lib/integrations/catalog";
+import { createCjProvider } from "@/lib/sourcing/providers/cjdropshipping";
+import { SourcingError } from "@/lib/sourcing/types";
 
 export type IntegrationView = {
   provider: string;
@@ -122,6 +124,23 @@ async function verify(provider: string, config: Record<string, string>): Promise
           return { ok: false, error: "Measurement IDs look like G-XXXXXXX." };
         }
         return { ok: true, label: config.measurementId };
+      }
+
+      case "cjdropshipping": {
+        // Authenticate the merchant's key against CJ's real token endpoint via
+        // the sourcing adapter. A rejected key is never stored as connected.
+        const cj = createCjProvider();
+        try {
+          await cj.searchProducts({ email: config.email, apiKey: config.apiKey }, { pageSize: 1 });
+        } catch (error) {
+          if (error instanceof SourcingError && (error.code === "auth" || error.code === "not_configured")) {
+            return { ok: false, error: "CJdropshipping rejected these credentials. Check the email and API key from My CJ → API." };
+          }
+          // Reachability/rate-limit issues shouldn't wrongly claim the key is bad,
+          // but we also must not mark connected without a real success.
+          return { ok: false, error: error instanceof Error ? `Could not verify with CJdropshipping: ${error.message}` : "Could not verify with CJdropshipping." };
+        }
+        return { ok: true, label: config.email || mask(config.apiKey) };
       }
 
       case "zapier":

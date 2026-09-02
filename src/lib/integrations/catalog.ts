@@ -17,6 +17,7 @@ export type IntegrationCategory =
   | "advertising"
   | "social"
   | "fulfillment"
+  | "sourcing"
   | "reviews"
   | "automation"
   | "support"
@@ -58,6 +59,7 @@ export const INTEGRATION_CATEGORIES: Array<{ id: IntegrationCategory; label: str
   { id: "advertising", label: "Advertising" },
   { id: "social", label: "Social" },
   { id: "fulfillment", label: "Fulfillment" },
+  { id: "sourcing", label: "Product sourcing" },
   { id: "reviews", label: "Reviews" },
   { id: "automation", label: "Automation" },
   { id: "support", label: "Customer support" },
@@ -246,6 +248,39 @@ export const INTEGRATION_CATALOG: IntegrationDefinition[] = [
     fields: [{ key: "apiKey", label: "API key", secret: true }],
     mark: "PY",
     accent: "#39b54a",
+  },
+  {
+    id: "cjdropshipping",
+    name: "CJdropshipping",
+    category: "sourcing",
+    description: "Source products, sync inventory and forward fulfillment to CJdropshipping.",
+    implementation: "credentials",
+    capability:
+      "Stores your CJ API key and authenticates against CJdropshipping's Open API v2. The product-source adapter (search, import, inventory, freight, order and tracking) is implemented; connect your own key from My CJ → API to use it. Fulfillment is paid from your CJ wallet; the API allows about one request per second.",
+    fields: [
+      { key: "email", label: "CJ account email", placeholder: "you@example.com" },
+      { key: "apiKey", label: "CJ API key", placeholder: "CJUserNum@api@…", secret: true },
+    ],
+    docsUrl: "https://developers.cjdropshipping.com/",
+    mark: "CJ",
+    accent: "#e43d30",
+  },
+  {
+    id: "aliexpress",
+    name: "AliExpress",
+    category: "sourcing",
+    description: "Import products and forward dropship orders through the AliExpress Open Platform.",
+    implementation: "planned",
+    capability:
+      "The AliExpress Dropshipping (ds.*) adapter implements signed product search and import; freight, order-create and tracking are documented and a follow-up. AliExpress gates the DS API behind an approved Open Platform app, so merchants can connect only once Halyard holds that approved app (see launch blockers). No supplier webhooks; sync is by polling.",
+    fields: [
+      { key: "appKey", label: "App key" },
+      { key: "appSecret", label: "App secret", secret: true },
+      { key: "session", label: "Merchant OAuth session", secret: true, optional: true },
+    ],
+    docsUrl: "https://openservice.aliexpress.com/",
+    mark: "AE",
+    accent: "#e62e04",
   },
   {
     id: "judgeme",
