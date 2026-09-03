@@ -356,7 +356,13 @@ export function DesignSettingsForm({
               <CardContent className="space-y-3">
                 <p className="text-[12.5px] text-ink-500">An escape hatch for the last 5%. Rules are scoped to your storefront, sanitised (no imports, external URLs or scripts) and limited to {CUSTOM_CSS_MAX.toLocaleString()} characters. Use the <code className="rounded bg-ink-100 px-1">--st-*</code> tokens where you can.</p>
                 <Textarea rows={10} disabled={disabled} className="font-mono text-[12px]" value={theme.customCss ?? ""} onChange={(e) => update({ customCss: e.target.value })} placeholder={".st-btn { letter-spacing: 0.1em; }\n.st-section[data-section-type=\"hero\"] h1 { font-style: italic; }"} />
-                <p className="text-[11.5px] text-ink-400">{(theme.customCss ?? "").length.toLocaleString()} / {CUSTOM_CSS_MAX.toLocaleString()}</p>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[11.5px] text-ink-400">{(theme.customCss ?? "").length.toLocaleString()} / {CUSTOM_CSS_MAX.toLocaleString()}</p>
+                  {(theme.customCss ?? "").length > 0 && canWrite && (
+                    <Button size="sm" variant="ghost" onClick={() => update({ customCss: "" })}><RotateCcw />Reset custom CSS</Button>
+                  )}
+                </div>
+                <p className="text-[12px] text-ink-500">Available on every plan, including Free. Reset clears it; saving with an empty box removes it from the live store.</p>
               </CardContent>
             </Card>
           </TabsContent>

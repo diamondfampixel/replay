@@ -42,6 +42,8 @@ export type Plan = {
     customDomain: boolean;
     /** Free storefronts carry a small "Built on Halyard" credit. */
     halyardBranding: boolean;
+    /** Rolling count of design snapshots kept per store (oldest eligible pruned). */
+    designSnapshots: number;
     analyticsHistoryDays: number | null;
     analyticsExport: boolean;
   };
@@ -75,6 +77,7 @@ export const PLANS: Plan[] = [
       liveCheckout: false,
       customDomain: false,
       halyardBranding: true,
+      designSnapshots: 5,
       analyticsHistoryDays: 30,
       analyticsExport: false,
     },
@@ -105,6 +108,7 @@ export const PLANS: Plan[] = [
       liveCheckout: true,
       customDomain: true,
       halyardBranding: false,
+      designSnapshots: 20,
       analyticsHistoryDays: null,
       analyticsExport: false,
     },
@@ -134,6 +138,7 @@ export const PLANS: Plan[] = [
       liveCheckout: true,
       customDomain: true,
       halyardBranding: false,
+      designSnapshots: 50,
       analyticsHistoryDays: null,
       analyticsExport: false,
     },
@@ -164,6 +169,7 @@ export const PLANS: Plan[] = [
       liveCheckout: true,
       customDomain: true,
       halyardBranding: false,
+      designSnapshots: 100,
       analyticsHistoryDays: null,
       analyticsExport: true,
     },

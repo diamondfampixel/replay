@@ -37,6 +37,19 @@ export function sanitizeCustomCss(input: string | null | undefined): CustomCssRe
   // @charset/@namespace/@font-face with remote sources add nothing here.
   css = css.replace(/@(charset|namespace|font-face)[^{;]*(\{[^}]*\}|;)/gi, "");
 
+  // Containment: a stray `}` would close the scoping block and let the rest of
+  // the sheet run unscoped. Drop any closing brace that has no opener, and
+  // close any that are left open, so the wrapper always holds.
+  let depth = 0;
+  let balanced = "";
+  for (const ch of css) {
+    if (ch === "{") depth += 1;
+    else if (ch === "}") { if (depth === 0) { warnings.push("Unbalanced `}` removed."); continue; } depth -= 1; }
+    balanced += ch;
+  }
+  if (depth > 0) { balanced += "}".repeat(depth); warnings.push("Unclosed block auto-closed."); }
+  css = balanced.replace(/\/\*[\s\S]*?\*\//g, (m) => (/[{}]/.test(m) ? "" : m));
+
   // Scope: wrap in a nesting block. Selectors like `html`/`body` become
   // `.st-root html`, which matches nothing — the storefront root is the ceiling.
   return { css: `.st-root {\n${css}\n}`, warnings };

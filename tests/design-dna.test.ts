@@ -114,3 +114,29 @@ describe("custom CSS sanitizer", () => {
     expect(sanitizeCustomCss("").css).toBe("");
   });
 });
+
+describe("custom CSS containment", () => {
+  it("cannot escape the storefront scope with a stray closing brace", () => {
+    const { css, warnings } = sanitizeCustomCss("} body { background: red } .x { color: blue }");
+    // Only one top-level block: the .st-root wrapper.
+    let depth = 0, topLevelBlocks = 0;
+    for (const ch of css) { if (ch === "{") { if (depth === 0) topLevelBlocks += 1; depth += 1; } else if (ch === "}") depth -= 1; }
+    expect(topLevelBlocks).toBe(1);
+    expect(depth).toBe(0);
+    expect(css.startsWith(".st-root {")).toBe(true);
+    expect(warnings.join(" ")).toMatch(/Unbalanced/);
+  });
+
+  it("closes an unclosed block so the wrapper still holds", () => {
+    const { css } = sanitizeCustomCss(".a { color: red; .b { color: blue;");
+    let depth = 0;
+    for (const ch of css) { if (ch === "{") depth += 1; else if (ch === "}") depth -= 1; }
+    expect(depth).toBe(0);
+  });
+
+  it("strips remote loads and script-ish constructs", () => {
+    const { css, warnings } = sanitizeCustomCss("@import url(https://evil.example/x.css); .a { background: url(https://evil.example/p.png); behavior: url(x.htc); color: expression(alert(1)) } </style><script>alert(1)</script>");
+    expect(css).not.toMatch(/@import|https:\/\/evil|expression\(|<script|<\/style|behavior:/i);
+    expect(warnings.length).toBeGreaterThanOrEqual(3);
+  });
+});

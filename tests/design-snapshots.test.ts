@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanupTestStore, createTestStore, testDb } from "./helpers";
 import { ensureHomepage } from "@/lib/services/provision";
-import { createDesignSnapshot, deleteDesignSnapshot, listDesignSnapshots, restoreDesignSnapshot } from "@/lib/services/snapshots";
+import { createDesignSnapshot, deleteDesignSnapshot, listDesignSnapshots, restoreDesignSnapshot, snapshotLimitFor } from "@/lib/services/snapshots";
 import { applyStoreTheme, getStoreTheme } from "@/lib/storefront/design";
 import type { ServiceContext } from "@/lib/services/context";
 
@@ -58,6 +58,34 @@ describe("design snapshots", () => {
     expect((await listDesignSnapshots(ctx)).some((s) => s.id === snap.id)).toBe(true);
     await deleteDesignSnapshot(ctx, snap.id);
     expect((await listDesignSnapshots(ctx)).some((s) => s.id === snap.id)).toBe(false);
+  });
+
+  it("keeps a rolling count per plan and recycles automatic snapshots before manual ones", async () => {
+    // Free plan keeps 5. Start clean.
+    await testDb.designSnapshot.deleteMany({ where: { storeId: ctx.storeId } });
+    await testDb.organization.update({ where: { id: ctx.organizationId }, data: { plan: "harbor" } });
+    expect(await snapshotLimitFor(ctx.storeId)).toBe(5);
+    const keep = await createDesignSnapshot(ctx, { label: "Keep me", source: "manual" });
+    for (let i = 0; i < 4; i += 1) await createDesignSnapshot(ctx, { label: `auto ${i}`, source: "auto" });
+    expect((await listDesignSnapshots(ctx)).length).toBe(5);
+    // The sixth pushes out the oldest automatic one — not the manual one.
+    await createDesignSnapshot(ctx, { label: "auto 4", source: "auto" });
+    const after = await listDesignSnapshots(ctx);
+    expect(after.length).toBe(5);
+    expect(after.some((s) => s.id === keep.id)).toBe(true);
+    expect(after.some((s) => s.label === "auto 0")).toBe(false);
+    // Upgrading raises the ceiling; downgrading prunes on the next write.
+    await testDb.organization.update({ where: { id: ctx.organizationId }, data: { plan: "skiff" } });
+    expect(await snapshotLimitFor(ctx.storeId)).toBe(20);
+    await testDb.organization.update({ where: { id: ctx.organizationId }, data: { plan: "clipper" } });
+    expect(await snapshotLimitFor(ctx.storeId)).toBe(50);
+    await testDb.organization.update({ where: { id: ctx.organizationId }, data: { plan: "flagship" } });
+    expect(await snapshotLimitFor(ctx.storeId)).toBe(100);
+    await testDb.organization.update({ where: { id: ctx.organizationId }, data: { plan: "harbor" } });
+    for (let i = 0; i < 3; i += 1) await createDesignSnapshot(ctx, { label: `more ${i}`, source: "ai" });
+    expect((await listDesignSnapshots(ctx)).length).toBe(5);
+    expect((await listDesignSnapshots(ctx)).some((s) => s.id === keep.id)).toBe(true);
+    await testDb.organization.update({ where: { id: ctx.organizationId }, data: { plan: "flagship" } });
   });
 
   it("refuses without storefront:write", async () => {

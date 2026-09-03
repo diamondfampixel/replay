@@ -3,6 +3,7 @@ import { Prisma, prisma } from "@/lib/db";
 import { audit, authorize, NotFoundError, type ServiceContext } from "@/lib/services/context";
 import { isSectionType, normaliseSectionConfig } from "@/lib/storefront/sections";
 import { storeThemeSchema } from "@/lib/storefront/theme";
+import { getPlan } from "@/lib/plans";
 
 export type SnapshotSource = "manual" | "ai" | "auto";
 export type SnapshotSummary = { id: string; label: string; source: SnapshotSource; createdAt: Date; pageCount: number };
@@ -12,7 +13,16 @@ type SnapshotPage = {
   sections: Array<{ id: string; type: string; visible: boolean; config: Record<string, unknown> }>;
 };
 
-const MAX_PER_STORE = 40;
+/**
+ * Retention is a rolling count per store, set by the organization's plan
+ * (Harbor 5 · Skiff 20 · Clipper 50 · Flagship 100). Snapshots are structured
+ * configuration only — theme JSON + section configs, never copies of media —
+ * so even the largest tier stays small.
+ */
+export async function snapshotLimitFor(storeId: string): Promise<number> {
+  const store = await prisma.store.findUniqueOrThrow({ where: { id: storeId }, select: { organization: { select: { plan: true } } } });
+  return getPlan(store.organization.plan).limits.designSnapshots;
+}
 
 /**
  * Captures the store's whole design — theme plus every page's live sections —
@@ -48,14 +58,23 @@ export async function createDesignSnapshot(ctx: ServiceContext, input: { label: 
   return { id: snapshot.id, label: snapshot.label, source: snapshot.source as SnapshotSource, createdAt: snapshot.createdAt, pageCount: captured.length };
 }
 
-/** Keeps the newest snapshots; automatic ones are dropped before manual ones. */
-async function prune(storeId: string) {
-  const all = await prisma.designSnapshot.findMany({ where: { storeId }, orderBy: { createdAt: "desc" }, select: { id: true, source: true } });
-  if (all.length <= MAX_PER_STORE) return;
-  const excess = all.length - MAX_PER_STORE;
-  const victims = [...all].reverse().sort((a, b) => (a.source === "manual" ? 1 : 0) - (b.source === "manual" ? 1 : 0)).slice(0, excess);
+/**
+ * Keeps the newest `limit` snapshots. When the limit is reached the oldest
+ * eligible snapshot goes first: automatic and AI snapshots before manual ones,
+ * and within a class the oldest first — a merchant's own named snapshot is the
+ * last thing to be recycled.
+ */
+export async function pruneSnapshots(storeId: string, limit?: number) {
+  const max = limit ?? (await snapshotLimitFor(storeId));
+  const all = await prisma.designSnapshot.findMany({ where: { storeId }, orderBy: { createdAt: "asc" }, select: { id: true, source: true } });
+  if (all.length <= max) return 0;
+  const excess = all.length - max;
+  const order = (source: string) => (source === "manual" ? 1 : 0);
+  const victims = [...all].sort((a, b) => order(a.source) - order(b.source)).slice(0, excess);
   await prisma.designSnapshot.deleteMany({ where: { storeId, id: { in: victims.map((v) => v.id) } } });
+  return victims.length;
 }
+const prune = pruneSnapshots;
 
 export async function listDesignSnapshots(ctx: ServiceContext, limit = 30): Promise<SnapshotSummary[]> {
   authorize(ctx, "storefront:read");
