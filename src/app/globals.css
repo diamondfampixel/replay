@@ -477,7 +477,8 @@ body {
 .st-editing .st-section { outline: 2px solid transparent; outline-offset: -2px; transition: outline-color 0.15s; cursor: pointer; }
 .st-editing .st-section:hover { outline-color: rgba(14, 124, 102, 0.55); }
 .st-editing .st-section.is-selected { outline-color: rgb(14, 124, 102); }
-.st-editing .st-section-tag { position: absolute; left: 0; top: 0; z-index: 30; background: rgb(14, 124, 102); color: #fff; font: 600 10px/1 system-ui, sans-serif; letter-spacing: .04em; text-transform: uppercase; padding: 4px 7px; border-bottom-right-radius: 6px; opacity: 0; pointer-events: none; }
+.st-section-tag { display: none; }
+.st-editing .st-section-tag { display: block; position: absolute; left: 0; top: 0; z-index: 30; background: rgb(14, 124, 102); color: #fff; font: 600 10px/1 system-ui, sans-serif; letter-spacing: .04em; text-transform: uppercase; padding: 4px 7px; border-bottom-right-radius: 6px; opacity: 0; pointer-events: none; }
 .st-editing .st-section:hover > .st-section-tag, .st-editing .st-section.is-selected > .st-section-tag { opacity: 1; }
 
 /* ==========================================================================
