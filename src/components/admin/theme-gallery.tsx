@@ -118,6 +118,7 @@ export function ThemeGallery({ themes, storeSlug, canWrite, canBuy, paymentsConf
       </div>
 
       <ThemeDetail
+        key={selected?.id ?? "none"}
         theme={selected}
         storeSlug={storeSlug}
         canWrite={canWrite}
@@ -193,7 +194,6 @@ function ThemeDetail({ theme, storeSlug, canWrite, canBuy, paymentsConfigured, b
 }) {
   const [device, setDevice] = React.useState<"desktop" | "mobile">("desktop");
   const [previewing, setPreviewing] = React.useState(false);
-  React.useEffect(() => { setPreviewing(false); setDevice("desktop"); }, [theme?.id]);
   if (!theme) return null;
   const premium = theme.tier !== "included";
   return (
@@ -222,7 +222,7 @@ function ThemeDetail({ theme, storeSlug, canWrite, canBuy, paymentsConfigured, b
               <div className="overflow-hidden rounded-lg border border-ink-200"><ThemeSwatch theme={theme} large /></div>
               <div>
                 <p className="text-[13.5px] leading-relaxed text-ink-700">{theme.description}</p>
-                <h3 className="mt-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-400">What's in it</h3>
+                <h3 className="mt-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-400">What&apos;s in it</h3>
                 <ul className="mt-1.5 space-y-1 text-[13px] text-ink-700">{theme.features.map((f) => <li key={f} className="flex items-start gap-1.5"><Check className="mt-0.5 size-3.5 shrink-0 text-pine-600" />{f}</li>)}</ul>
                 <h3 className="mt-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-400">Homepage composition</h3>
                 <p className="mt-1 text-[12px] text-ink-500">{theme.sections.map((s) => s.replace(":", " · ")).join("  →  ")}</p>
