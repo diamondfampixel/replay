@@ -48,7 +48,7 @@ export function Hero({ c, ctx }: { c: SectionConfig<"hero">; ctx: Ctx }) {
             ? `linear-gradient(to top, rgba(8,8,8,${0.35 + (media.overlay || 30) / 200}), rgba(8,8,8,${(media.overlay || 30) / 300}))`
             : `linear-gradient(to right, rgba(8,8,8,${0.4 + (media.overlay || 30) / 200}), rgba(8,8,8,${(media.overlay || 30) / 400}) 60%, transparent)` }} />
         )}
-        <div className={cn("st-section-inner relative flex flex-col justify-center", PAD[c.height], HEIGHT[c.height], centred && "items-center text-center")} style={{ maxWidth: "var(--st-max-width)", color: media ? "#fff" : undefined }}>
+        <div className={cn("st-bleed-inner relative flex flex-col justify-center", PAD[c.height], HEIGHT[c.height], centred && "items-center text-center")} style={{ maxWidth: "var(--st-max-width)", color: media ? "#fff" : undefined }}>
           <Eyebrow className={media ? "text-white/80" : undefined}>{c.eyebrow}</Eyebrow>
           <h1 className={cn("st-heading-transform max-w-4xl", heading)}>{c.headline}</h1>
           {c.subheadline && <p className={cn("st-lead mt-5 max-w-xl", !media && "st-muted")} style={media ? { color: "rgba(255,255,255,0.88)" } : undefined}>{c.subheadline}</p>}
@@ -154,7 +154,7 @@ export function ImageHero({ c, ctx }: { c: SectionConfig<"imageHero">; ctx: Ctx 
     return (
       <SectionShell {...shell} type="imageHero" design={c.design} bleed className="overflow-hidden">
         <div className={cn("relative", HEIGHT[c.height] || "min-h-[56vh]")}>{image}</div>
-        <div className="st-section-inner grid gap-6 py-8 md:grid-cols-[1fr_auto] md:items-end" style={{ maxWidth: "var(--st-max-width)" }}>
+        <div className="st-bleed-inner grid gap-6 py-8 md:grid-cols-[1fr_auto] md:items-end" style={{ maxWidth: "var(--st-max-width)" }}>
           <div>
             <Eyebrow>{c.eyebrow}</Eyebrow>
             <h2 className="st-heading-transform st-h-lg">{c.headline}</h2>
@@ -172,7 +172,7 @@ export function ImageHero({ c, ctx }: { c: SectionConfig<"imageHero">; ctx: Ctx 
     <SectionShell {...shell} type="imageHero" design={{ ...c.design, scheme: "contrast", paddingTop: "none", paddingBottom: "none" }} bleed className={cn("relative overflow-hidden", HEIGHT[c.height] || "min-h-[56vh]")}>
       {image}
       <div className="absolute inset-0" style={{ background: bottomLeft ? `linear-gradient(to top, rgba(0,0,0,${overlay + 0.3}), rgba(0,0,0,${overlay / 3}) 60%)` : `rgba(0,0,0,${overlay})` }} aria-hidden="true" />
-      <div className={cn("st-section-inner relative flex flex-col text-white", PAD[c.height], HEIGHT[c.height] || "min-h-[56vh]", bottomLeft ? "justify-end" : "justify-center", centred && "items-center text-center")} style={{ maxWidth: "var(--st-max-width)" }}>
+      <div className={cn("st-bleed-inner relative flex flex-col text-white", PAD[c.height], HEIGHT[c.height] || "min-h-[56vh]", bottomLeft ? "justify-end" : "justify-center", centred && "items-center text-center")} style={{ maxWidth: "var(--st-max-width)" }}>
         <Eyebrow className="text-white/80">{c.eyebrow}</Eyebrow>
         <h2 className={cn("st-heading-transform max-w-3xl", bottomLeft ? "st-h-xl" : "st-h-xl")}>{c.headline}</h2>
         {c.subheadline && <p className="st-lead mt-4 max-w-lg" style={{ color: "rgba(255,255,255,0.88)" }}>{c.subheadline}</p>}
@@ -196,7 +196,7 @@ export function VideoHero({ c, ctx }: { c: SectionConfig<"videoHero">; ctx: Ctx 
       )}
       {c.videoUrl && <VideoBackground src={c.videoUrl} poster={c.posterUrl} />}
       <div className="absolute inset-0" style={{ background: `rgba(0,0,0,${overlay})` }} aria-hidden="true" />
-      <div className={cn("st-section-inner relative flex flex-col justify-center text-white", PAD[c.height], HEIGHT[c.height] || "min-h-[72vh]", centred && "items-center text-center")} style={{ maxWidth: "var(--st-max-width)" }}>
+      <div className={cn("st-bleed-inner relative flex flex-col justify-center text-white", PAD[c.height], HEIGHT[c.height] || "min-h-[72vh]", centred && "items-center text-center")} style={{ maxWidth: "var(--st-max-width)" }}>
         <Eyebrow className="text-white/80">{c.eyebrow}</Eyebrow>
         <h2 className="st-heading-transform st-h-xl max-w-3xl">{c.headline}</h2>
         {c.subheadline && <p className="st-lead mt-4 max-w-lg" style={{ color: "rgba(255,255,255,0.88)" }}>{c.subheadline}</p>}

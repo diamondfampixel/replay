@@ -96,7 +96,7 @@ export async function FeaturedProduct({ c, ctx }: { c: SectionConfig<"featuredPr
     return (
       <SectionShell {...shell} type="featuredProduct" design={{ ...c.design, scheme: "contrast", paddingTop: "none", paddingBottom: "none" }} bleed className="relative min-h-[60vh] overflow-hidden">
         <Media media={{ ...image, overlay: 45 }} fill />
-        <div className="st-section-inner relative flex min-h-[60vh] flex-col justify-end py-14 text-white" style={{ maxWidth: "var(--st-max-width)" }}>
+        <div className="st-bleed-inner relative flex min-h-[60vh] flex-col justify-end py-14 text-white" style={{ maxWidth: "var(--st-max-width)" }}>
           <Eyebrow className="text-white/80">{c.eyebrow}</Eyebrow>
           <h2 className="st-heading-transform st-h-xl max-w-2xl">{heading}</h2>
           {body && <p className="st-lead mt-4 max-w-lg" style={{ color: "rgba(255,255,255,0.85)" }}>{body.slice(0, 240)}</p>}
@@ -154,7 +154,7 @@ export async function CollectionGrid({ c, ctx }: { c: SectionConfig<"collectionG
       <SectionHeading title={c.heading} />
       {collections.length === 0 ? (
         <EmptyNote>No collections to show yet.</EmptyNote>
-      ) : c.layout === "mosaic" ? (
+      ) : c.layout === "mosaic" && collections.length >= 3 ? (
         <Stagger className="st-mosaic">
           {collections.slice(0, 5).map((col, i) => (
             <StoreLink key={col.id} href={`/collections/${col.slug}`} storeSlug={s} className="st-card-hover group relative block overflow-hidden st-radius-image" style={staggerIndex(i)}>
@@ -252,7 +252,7 @@ export async function CollectionHero({ c, ctx }: { c: SectionConfig<"collectionH
   return (
     <SectionShell {...shell} type="collectionHero" design={{ ...c.design, scheme: "contrast", paddingTop: "none", paddingBottom: "none" }} bleed className="relative min-h-[48vh] overflow-hidden">
       <Media media={{ ...media, overlay: Math.max(media.overlay, 40) }} fill />
-      <div className="st-section-inner relative flex min-h-[48vh] flex-col justify-end py-12 text-white" style={{ maxWidth: "var(--st-max-width)" }}>
+      <div className="st-bleed-inner relative flex min-h-[48vh] flex-col justify-end py-12 text-white" style={{ maxWidth: "var(--st-max-width)" }}>
         <Eyebrow className="text-white/80">Collection · {col.productCount} items</Eyebrow>
         <h2 className="st-heading-transform st-h-xl max-w-2xl">{headline}</h2>
         {body && <p className="st-lead mt-3 max-w-lg" style={{ color: "rgba(255,255,255,0.85)" }}>{body}</p>}

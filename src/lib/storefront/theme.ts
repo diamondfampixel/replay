@@ -527,7 +527,7 @@ export function resolveTheme(input: { theme?: unknown; primaryColor: string; sec
   const contrastFg = readableInk(contrastBg);
   const brand = solidFill(accent);
   const link = cr.link ?? (contrastRatio(accent, bg) >= 4.5 ? accent : ink);
-  const sale = cr.sale ?? "#b4331f";
+  const sale = cr.sale ?? ensureAA(hexToRgb(isDark ? "#ff8a6a" : "#b4331f"), bgRgb, inkRgb);
   const success = cr.success ?? "#0e7c66";
   const warning = cr.warning ?? "#a1660a";
 

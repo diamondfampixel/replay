@@ -59,7 +59,7 @@ export function CustomBanner({ c, ctx }: { c: SectionConfig<"customBanner">; ctx
     return (
       <SectionShell {...shell} type="customBanner" design={{ ...c.design, scheme: "contrast", paddingTop: "none", paddingBottom: "none" }} bleed className="relative min-h-[360px] overflow-hidden">
         <Media media={{ ...c.media, overlay: Math.max(c.media.overlay, 40) }} fill />
-        <div className="st-section-inner relative flex min-h-[360px] flex-col items-start justify-center py-12 text-white" style={{ maxWidth: "var(--st-max-width)" }}>
+        <div className="st-bleed-inner relative flex min-h-[360px] flex-col items-start justify-center py-12 text-white" style={{ maxWidth: "var(--st-max-width)" }}>
           <h2 className="st-heading-transform st-h-lg max-w-2xl">{c.heading}</h2>
           {c.body && <p className="st-lead mt-3 max-w-lg" style={{ color: "rgba(255,255,255,0.85)" }}>{c.body}</p>}
           {cta && <div className="mt-6">{cta}</div>}

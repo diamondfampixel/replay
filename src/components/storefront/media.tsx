@@ -28,6 +28,7 @@ export function Media({
 
   return (
     <div
+      data-fill={fill ? "true" : undefined}
       className={cn("st-media", fill ? "absolute inset-0" : "st-radius-image", className)}
       style={fill ? style : { aspectRatio: aspect, ...style }}
     >

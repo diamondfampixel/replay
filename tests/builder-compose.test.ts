@@ -34,7 +34,9 @@ describe("composition engine", () => {
     const bare = composeHomepage(themeFor("technical"), brief());
     expect(bare.some((s) => ["benefits", "stats", "faq", "quote", "valueProps", "testimonials", "marquee"].includes(s.type))).toBe(false);
     const withFacts = composeHomepage(themeFor("technical"), brief({ facts: { benefits: [{ title: "2-year warranty", body: "On everything." }], stats: [{ value: "12k", label: "orders shipped" }], faqs: [{ q: "Ship abroad?", a: "Yes." }] } }));
-    expect(withFacts.map((s) => s.type)).toEqual(expect.arrayContaining(["valueProps", "benefits", "stats", "faq"]));
+    expect(withFacts.map((s) => s.type)).toEqual(expect.arrayContaining(["valueProps", "stats", "faq"]));
+    const organic = composeHomepage(themeFor("organic"), brief({ facts: { benefits: [{ title: "Hand picked" }] } }));
+    expect(organic.some((s) => s.type === "benefits")).toBe(true);
     const stat = withFacts.find((s) => s.type === "stats")!;
     expect(stat.config.items).toEqual([{ value: "12k", label: "orders shipped" }]);
   });

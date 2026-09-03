@@ -40,6 +40,11 @@ type Slot = { type: SectionType; layout?: string; patch?: (b: ComposeBrief, t: T
 
 const short = (s: string | null | undefined, n: number) => (s ?? "").replace(/\s+/g, " ").trim().slice(0, n);
 const words = (s: string | null | undefined, n: number) => (s ?? "").split(/\s+/).slice(0, n).join(" ");
+/** First sentence of a description, capped — reads as a heading, never a fragment. */
+const firstSentence = (s: string | null | undefined, max = 90) => {
+  const sentence = (s ?? "").split(/(?<=[.!?])\s+/)[0]?.trim() ?? "";
+  return sentence.length <= max ? sentence : `${words(sentence, 10)}…`;
+};
 
 function newsletterCopy(t: ThemeLike) {
   const { tone, era } = t.dna;
@@ -66,8 +71,8 @@ const STATS = (layout: string): Slot => ({ type: "stats", layout, patch: (b) => 
 const MARQUEE = (size: string): Slot => ({ type: "marquee", patch: (b) => (b.facts?.marquee?.length ? { items: b.facts.marquee.map((text) => ({ text })), size } : null) });
 const QUOTE = (layout: string): Slot => ({ type: "quote", layout, patch: (b) => (b.facts?.quote ? { quote: b.facts.quote.quote, author: b.facts.quote.author ?? "", role: b.facts.quote.role ?? "" } : null) });
 const ANNOUNCE = (layout: string, background: string): Slot => ({ type: "announcement", layout, patch: (b) => (b.facts?.announcement ? { text: b.facts.announcement, background } : null) });
-const STATEMENT: Slot = { type: "text", layout: "statement", patch: (b) => (b.description ? { heading: words(b.description, 14), body: "" } : null) };
-const INTRO: Slot = { type: "text", layout: "eyebrow", patch: (b) => (b.description ? { eyebrow: b.industry ?? "About", heading: words(b.description, 10), body: short(b.description, 400) } : null) };
+const STATEMENT: Slot = { type: "text", layout: "statement", patch: (b) => (b.description ? { heading: firstSentence(b.description, 120), body: "" } : null) };
+const INTRO: Slot = { type: "text", layout: "eyebrow", patch: (b) => (b.description ? { eyebrow: b.industry ?? "About", heading: firstSentence(b.description), body: short(b.description, 400) } : null) };
 const FEATURED_PRODUCT = (layout: string): Slot => ({ type: "featuredProduct", layout, patch: (b) => (b.catalog.featuredProductId ? { productId: b.catalog.featuredProductId, eyebrow: b.goal === "launch" ? "Just landed" : "Featured" } : null) });
 const STORY: Slot = { type: "story", layout: "steps", patch: (b) => (b.facts?.benefits && b.facts.benefits.length >= 3 ? { heading: "How it works", items: b.facts.benefits.slice(0, 4).map((x) => ({ title: x.title, body: x.body ?? "" })) } : null) };
 
@@ -79,7 +84,7 @@ const RECIPES: Record<ThemeLike["direction"], Slot[]> = {
   bold: [ANNOUNCE("marquee", "brand"), { ...HERO, layout: "fullBleed" }, MARQUEE("lg"), FEATURED("asymmetric", 6), ABOUT("overlap"), COLLECTIONS("mosaic"), STATS("row"), REVIEWS, NEWSLETTER("banner")],
   luxury: [{ ...HERO, layout: "minimal" }, FEATURED("editorial", 3), STATEMENT, ABOUT("narrowImage"), QUOTE("large"), COLLECTIONS("list"), NEWSLETTER("centered")],
   playful: [ANNOUNCE("static", "brand"), { ...HERO, layout: "center" }, MARQUEE("md"), FEATURED("carousel", 8), BENEFITS("cards"), COLLECTIONS("circles"), REVIEWS, FAQ("accordion"), NEWSLETTER("split")],
-  technical: [{ ...HERO, layout: "split" }, VALUE_PROPS, FEATURED("grid", 8, 4), STATS("grid"), ABOUT("split"), BENEFITS("icons"), FAQ("twoColumn"), NEWSLETTER("inline")],
+  technical: [{ ...HERO, layout: "split" }, VALUE_PROPS, FEATURED("grid", 8, 4), STATS("grid"), ABOUT("split"), FAQ("twoColumn"), NEWSLETTER("inline")],
   organic: [{ ...HERO, layout: "split" }, INTRO, FEATURED("grid", 6, 3), BENEFITS("rows"), ABOUT("stacked"), REVIEWS, NEWSLETTER("centered")],
   energy: [ANNOUNCE("marquee", "ink"), { ...HERO, layout: "fullBleed" }, MARQUEE("xl"), FEATURED("asymmetric", 6), COLLECTIONS("mosaic"), FEATURED_PRODUCT("poster"), STATS("inline"), NEWSLETTER("banner")],
   creator: [{ ...HERO, layout: "asymmetric" }, MARQUEE("lg"), FEATURED("asymmetric", 6), STORY, COLLECTIONS("circles"), QUOTE("editorial"), REVIEWS, NEWSLETTER("banner")],
