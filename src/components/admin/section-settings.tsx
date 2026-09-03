@@ -1,439 +1,292 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, Plus, Trash2 } from "lucide-react";
 import { Field, Input, Label, Select, Textarea } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Switch, Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/misc";
 import { ImageField } from "@/components/admin/media-picker";
 import { SECTION_META, type SectionType } from "@/lib/storefront/sections";
+import { DESIGN_FIELDS, SECTION_FIELDS, type FieldSpec } from "@/lib/storefront/section-fields";
+import { cn } from "@/lib/utils";
 
 type Config = Record<string, unknown>;
+export type EditorMode = "simple" | "advanced";
 
 /**
- * Renders the editing form for a section's configuration. Each control writes
- * one key of the section's JSON config — exactly what the AI tools write too.
+ * Editing form for one section, generated from the declarative field specs.
+ * Three tabs: Content (copy, media, blocks), Layout (composition + layout
+ * knobs) and Design (the shared per-section design overrides). Simple mode
+ * hides the advanced fields and the Design tab so a beginner sees only what
+ * matters.
  */
 export function SectionSettings({
-  type,
-  config,
-  onChange,
-  collections,
-  products,
+  type, config, onChange, collections, products, schemes, mode,
 }: {
   type: SectionType;
   config: Config;
   onChange: (config: Config) => void;
   collections: Array<{ slug: string; title: string }>;
   products: Array<{ id: string; title: string }>;
+  schemes: Array<{ id: string; name: string }>;
+  mode: EditorMode;
 }) {
-  function set(key: string, value: unknown) {
-    onChange({ ...config, [key]: value });
-  }
-
-  const text = (key: string) => (typeof config[key] === "string" ? (config[key] as string) : "");
-  const num = (key: string, fallback: number) =>
-    typeof config[key] === "number" ? (config[key] as number) : fallback;
+  const meta = SECTION_META[type];
+  const fields = SECTION_FIELDS[type].filter((f) => mode === "advanced" || !f.advanced);
+  const content = fields.filter((f) => (f.group ?? "content") === "content");
+  const layout = fields.filter((f) => f.group === "layout");
+  const design = (config.design ?? {}) as Config;
+  const set = (key: string, value: unknown) => onChange({ ...config, [key]: value, ...(key === "media" ? { imageUrl: (value as { url?: string | null })?.url ?? null } : {}) });
+  const setDesign = (key: string, value: unknown) => onChange({ ...config, design: { ...design, [key]: value } });
+  const ctx = { collections, products, config };
 
   return (
-    <div className="space-y-3.5">
-      <p className="text-[12px] text-ink-500">{SECTION_META[type].description}</p>
-
-      {(type === "hero" || type === "imageHero") && (
-        <>
-          <Field label="Headline" htmlFor="headline">
-            <Textarea id="headline" rows={2} value={text("headline")} onChange={(e) => set("headline", e.target.value)} />
-          </Field>
-          <Field label="Subheadline" htmlFor="subheadline">
-            <Textarea id="subheadline" rows={2} value={text("subheadline")} onChange={(e) => set("subheadline", e.target.value)} />
-          </Field>
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="Button label" htmlFor="ctaLabel">
-              <Input id="ctaLabel" value={text("ctaLabel")} onChange={(e) => set("ctaLabel", e.target.value)} />
-            </Field>
-            <Field label="Button link" htmlFor="ctaHref">
-              <Input id="ctaHref" value={text("ctaHref")} onChange={(e) => set("ctaHref", e.target.value)} placeholder="/shop" />
-            </Field>
-          </div>
-          {type === "hero" && (
-            <div className="grid grid-cols-2 gap-2">
-              <Field label="Second button" htmlFor="secondaryCtaLabel">
-                <Input id="secondaryCtaLabel" value={text("secondaryCtaLabel")} onChange={(e) => set("secondaryCtaLabel", e.target.value)} />
-              </Field>
-              <Field label="Second link" htmlFor="secondaryCtaHref">
-                <Input id="secondaryCtaHref" value={text("secondaryCtaHref")} onChange={(e) => set("secondaryCtaHref", e.target.value)} />
-              </Field>
-            </div>
-          )}
-          <Field label="Background image">
-            <ImageField value={(config.imageUrl as string) ?? null} onChange={(url) => set("imageUrl", url)} />
-          </Field>
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="Alignment" htmlFor="align">
-              <Select id="align" value={text("align") || "left"} onChange={(e) => set("align", e.target.value)}>
-                <option value="left">Left</option>
-                <option value="center">Centred</option>
-              </Select>
-            </Field>
-            {type === "hero" ? (
-              <Field label="Height" htmlFor="height">
-                <Select id="height" value={text("height") || "large"} onChange={(e) => set("height", e.target.value)}>
-                  <option value="small">Small</option>
-                  <option value="medium">Medium</option>
-                  <option value="large">Large</option>
-                </Select>
-              </Field>
-            ) : (
-              <Field label="Overlay strength" htmlFor="overlay">
-                <Input
-                  id="overlay" type="number" min="0" max="80"
-                  value={num("overlay", 30)}
-                  onChange={(e) => set("overlay", Number(e.target.value))}
-                />
-              </Field>
-            )}
-          </div>
-        </>
-      )}
-
-      {type === "announcement" && (
-        <>
-          <Field label="Message" htmlFor="text">
-            <Input id="text" value={text("text")} onChange={(e) => set("text", e.target.value)} />
-          </Field>
-          <Field label="Link" htmlFor="link">
-            <Input id="link" value={text("link")} onChange={(e) => set("link", e.target.value)} placeholder="/shop" />
-          </Field>
-          <Field label="Background" htmlFor="announceBg">
-            <Select id="announceBg" value={text("background") || "ink"} onChange={(e) => set("background", e.target.value)}>
-              <option value="ink">Dark</option>
-              <option value="brand">Brand colour</option>
-              <option value="muted">Light</option>
-            </Select>
-          </Field>
-        </>
-      )}
-
-      {(type === "featuredProducts" || type === "productGrid" || type === "collectionGrid" ||
-        type === "reviews" || type === "faq" || type === "newsletter" || type === "benefits" ||
-        type === "testimonials" || type === "text" || type === "imageText" || type === "customBanner") && (
-        <Field label="Heading" htmlFor="heading">
-          <Input id="heading" value={text("heading")} onChange={(e) => set("heading", e.target.value)} />
-        </Field>
-      )}
-
-      {type === "featuredProducts" && (
-        <>
-          <Field label="Subheading" htmlFor="subheading">
-            <Input id="subheading" value={text("subheading")} onChange={(e) => set("subheading", e.target.value)} />
-          </Field>
-          <Field label="Products come from" htmlFor="source">
-            <Select id="source" value={text("source") || "newest"} onChange={(e) => set("source", e.target.value)}>
-              <option value="newest">Newest products</option>
-              <option value="bestsellers">Best sellers</option>
-              <option value="collection">A collection</option>
-              <option value="manual">Chosen by hand</option>
-            </Select>
-          </Field>
-          {text("source") === "collection" && (
-            <Field label="Collection" htmlFor="collectionSlug">
-              <Select id="collectionSlug" value={text("collectionSlug")} onChange={(e) => set("collectionSlug", e.target.value)}>
-                <option value="">Choose a collection…</option>
-                {collections.map((collection) => (
-                  <option key={collection.slug} value={collection.slug}>{collection.title}</option>
-                ))}
-              </Select>
-            </Field>
-          )}
-          {text("source") === "manual" && (
+    <div className="space-y-3">
+      <p className="text-[12px] text-ink-500">{meta.description}</p>
+      <Tabs defaultValue="content">
+        <TabsList className="w-full">
+          <TabsTrigger value="content" className="flex-1">Content</TabsTrigger>
+          {(meta.layouts || layout.length > 0) && <TabsTrigger value="layout" className="flex-1">Layout</TabsTrigger>}
+          {mode === "advanced" && <TabsTrigger value="design" className="flex-1">Design</TabsTrigger>}
+        </TabsList>
+        <TabsContent value="content" className="space-y-3.5 pt-3">
+          {content.map((f) => <FieldControl key={f.key} field={f} value={config[f.key]} onChange={(v) => set(f.key, v)} ctx={ctx} />)}
+          {content.length === 0 && <p className="text-[12px] text-ink-400">This section has no content fields.</p>}
+        </TabsContent>
+        <TabsContent value="layout" className="space-y-3.5 pt-3">
+          {meta.layouts && (
             <div>
-              <Label>Products</Label>
-              <div className="scroll-thin max-h-44 space-y-0.5 overflow-y-auto rounded-md border border-ink-200 p-2">
-                {products.map((product) => {
-                  const selected = ((config.productIds as string[]) ?? []).includes(product.id);
-                  return (
-                    <label key={product.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-[12.5px] hover:bg-ink-50">
-                      <input
-                        type="checkbox"
-                        className="size-3.5 accent-[var(--color-pine-600)]"
-                        checked={selected}
-                        onChange={(event) => {
-                          const current = ((config.productIds as string[]) ?? []);
-                          set(
-                            "productIds",
-                            event.target.checked
-                              ? [...current, product.id]
-                              : current.filter((id) => id !== product.id),
-                          );
-                        }}
-                      />
-                      <span className="truncate text-ink-700">{product.title}</span>
-                    </label>
-                  );
-                })}
+              <Label>Composition</Label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {meta.layouts.map((l) => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    onClick={() => set("layout", l.id)}
+                    aria-pressed={config.layout === l.id}
+                    className={cn("rounded-md border px-2.5 py-2 text-left text-[12px] transition-colors", config.layout === l.id ? "border-ink-900 bg-ink-900 text-white" : "border-ink-200 text-ink-700 hover:border-ink-400")}
+                  >
+                    {l.label}
+                  </button>
+                ))}
               </div>
             </div>
           )}
-          <Field label="How many" htmlFor="limit">
-            <Input id="limit" type="number" min="2" max="12" value={num("limit", 4)} onChange={(e) => set("limit", Number(e.target.value))} />
-          </Field>
-        </>
-      )}
+          {layout.map((f) => <FieldControl key={f.key} field={f} value={config[f.key]} onChange={(v) => set(f.key, v)} ctx={ctx} />)}
+        </TabsContent>
+        <TabsContent value="design" className="space-y-3.5 pt-3">
+          <p className="text-[11.5px] text-ink-500">Bend this one section. Global colours, type and spacing live under Settings → Design.</p>
+          {DESIGN_FIELDS.map((f) => (
+            <React.Fragment key={f.key}>
+              <FieldControl field={f} value={design[f.key]} onChange={(v) => setDesign(f.key, v)} ctx={ctx} />
+              {f.key === "scheme" && design.scheme === "custom" && (
+                <Field label="Custom scheme" htmlFor="customScheme">
+                  <Select id="customScheme" value={String(design.customScheme ?? "")} onChange={(e) => setDesign("customScheme", e.target.value)}>
+                    <option value="">Choose…</option>
+                    {schemes.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </Select>
+                  {schemes.length === 0 && <p className="mt-1 text-[11.5px] text-ink-400">Create custom schemes under Settings → Design → Colours.</p>}
+                </Field>
+              )}
+            </React.Fragment>
+          ))}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
 
-      {type === "collectionGrid" && (
+type Ctx = { collections: Array<{ slug: string; title: string }>; products: Array<{ id: string; title: string }>; config: Config };
+
+function FieldControl({ field, value, onChange, ctx }: { field: FieldSpec; value: unknown; onChange: (value: unknown) => void; ctx: Ctx }) {
+  const id = React.useId();
+  if (field.showIf && !field.showIf(ctx.config)) return null;
+  const str = typeof value === "string" ? value : typeof value === "number" ? String(value) : "";
+
+  switch (field.type) {
+    case "text":
+    case "url":
+      return (
+        <Field label={field.label} htmlFor={id} hint={field.hint}>
+          <Input id={id} value={str} onChange={(e) => onChange(e.target.value)} placeholder={field.type === "url" ? "/shop" : undefined} />
+        </Field>
+      );
+    case "textarea":
+      return (
+        <Field label={field.label} htmlFor={id} hint={field.hint}>
+          <Textarea id={id} rows={field.rows ?? 3} value={str} onChange={(e) => onChange(e.target.value)} />
+        </Field>
+      );
+    case "number":
+      return (
+        <Field label={field.label} htmlFor={id} hint={field.hint}>
+          <Input id={id} type="number" min={field.min} max={field.max} value={typeof value === "number" ? value : ""} onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))} />
+        </Field>
+      );
+    case "boolean":
+      return (
+        <label className="flex items-center justify-between gap-3 text-[12.5px] text-ink-700">
+          <span>{field.label}</span>
+          <Switch checked={Boolean(value)} onCheckedChange={(checked) => onChange(checked)} />
+        </label>
+      );
+    case "select":
+      return (
+        <Field label={field.label} htmlFor={id} hint={field.hint}>
+          <Select id={id} value={str} onChange={(e) => { const raw = e.target.value; const opt = field.options.find((o) => String(o.value) === raw); onChange(opt ? opt.value : raw); }}>
+            {field.options.map((o) => <option key={String(o.value)} value={String(o.value)}>{o.label}</option>)}
+          </Select>
+        </Field>
+      );
+    case "media":
+      return <MediaControl label={field.label} value={(value as Config | null) ?? null} onChange={onChange} hint={field.hint} />;
+    case "collection":
+      return (
+        <Field label={field.label} htmlFor={id} hint={field.hint}>
+          <Select id={id} value={str} onChange={(e) => onChange(e.target.value)}>
+            <option value="">Choose a collection…</option>
+            {ctx.collections.map((c) => <option key={c.slug} value={c.slug}>{c.title}</option>)}
+          </Select>
+        </Field>
+      );
+    case "product":
+      return (
+        <Field label={field.label} htmlFor={id} hint={field.hint}>
+          <Select id={id} value={str} onChange={(e) => onChange(e.target.value)}>
+            <option value="">Choose a product…</option>
+            {ctx.products.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+          </Select>
+        </Field>
+      );
+    case "collections":
+    case "products": {
+      const list = ctx[field.type === "collections" ? "collections" : "products"] as Array<{ slug?: string; id?: string; title: string }>;
+      const keyOf = (item: { slug?: string; id?: string }) => (field.type === "collections" ? item.slug! : item.id!);
+      const selected = (Array.isArray(value) ? value : []) as string[];
+      return (
         <div>
-          <Label>Collections shown</Label>
+          <Label>{field.label}</Label>
           <div className="scroll-thin max-h-44 space-y-0.5 overflow-y-auto rounded-md border border-ink-200 p-2">
-            {collections.map((collection) => {
-              const selected = ((config.collectionSlugs as string[]) ?? []).includes(collection.slug);
+            {list.map((item) => {
+              const k = keyOf(item);
               return (
-                <label key={collection.slug} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-[12.5px] hover:bg-ink-50">
-                  <input
-                    type="checkbox"
-                    className="size-3.5 accent-[var(--color-pine-600)]"
-                    checked={selected}
-                    onChange={(event) => {
-                      const current = ((config.collectionSlugs as string[]) ?? []);
-                      set(
-                        "collectionSlugs",
-                        event.target.checked
-                          ? [...current, collection.slug]
-                          : current.filter((slug) => slug !== collection.slug),
-                      );
-                    }}
-                  />
-                  <span className="truncate text-ink-700">{collection.title}</span>
+                <label key={k} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-[12.5px] hover:bg-ink-50">
+                  <input type="checkbox" className="size-3.5 accent-[var(--color-pine-600)]" checked={selected.includes(k)} onChange={(e) => onChange(e.target.checked ? [...selected, k] : selected.filter((x) => x !== k))} />
+                  <span className="truncate text-ink-700">{item.title}</span>
                 </label>
               );
             })}
+            {list.length === 0 && <p className="px-1 py-2 text-[12px] text-ink-400">Nothing to choose from yet.</p>}
           </div>
-          <p className="mt-1 text-[11.5px] text-ink-400">Leave all unchecked to show your first six collections.</p>
+          {field.hint && <p className="mt-1 text-[11.5px] text-ink-400">{field.hint}</p>}
         </div>
-      )}
+      );
+    }
+    case "items":
+      return <BlocksList field={field} items={(Array.isArray(value) ? value : []) as Config[]} onChange={onChange} ctx={ctx} />;
+    default:
+      return null;
+  }
+}
 
-      {type === "productGrid" && (
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="How many" htmlFor="gridLimit">
-            <Input id="gridLimit" type="number" min="3" max="48" value={num("limit", 12)} onChange={(e) => set("limit", Number(e.target.value))} />
-          </Field>
-          <Field label="Columns" htmlFor="columns">
-            <Select id="columns" value={String(num("columns", 4))} onChange={(e) => set("columns", Number(e.target.value))}>
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
-            </Select>
-          </Field>
-        </div>
-      )}
-
-      {(type === "text" || type === "imageText" || type === "customBanner") && (
-        <Field label="Body" htmlFor="body">
-          <Textarea id="body" rows={5} value={text("body")} onChange={(e) => set("body", e.target.value)} />
-        </Field>
-      )}
-
-      {type === "imageText" && (
+function MediaControl({ label, value, onChange, hint }: { label: string; value: Config | null; onChange: (v: Config) => void; hint?: string }) {
+  const media = { url: null, alt: "", focalX: 50, focalY: 50, overlay: 0, mobileUrl: null, ...(value ?? {}) } as { url: string | null; alt: string; focalX: number; focalY: number; overlay: number; mobileUrl: string | null };
+  const patch = (p: Partial<typeof media>) => onChange({ ...media, ...p });
+  const [more, setMore] = React.useState(false);
+  return (
+    <div className="space-y-2">
+      <Field label={label} hint={hint}>
+        <ImageField value={media.url} onChange={(url) => patch({ url })} />
+      </Field>
+      {media.url && (
         <>
-          <Field label="Image">
-            <ImageField value={(config.imageUrl as string) ?? null} onChange={(url) => set("imageUrl", url)} />
+          <Field label="Alt text" htmlFor={`alt-${label}`} hint="Describe the image for screen readers and search.">
+            <Input id={`alt-${label}`} value={media.alt} onChange={(e) => patch({ alt: e.target.value })} className="h-8 text-[12.5px]" />
           </Field>
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="Image side" htmlFor="imagePosition">
-              <Select id="imagePosition" value={text("imagePosition") || "right"} onChange={(e) => set("imagePosition", e.target.value)}>
-                <option value="left">Left</option>
-                <option value="right">Right</option>
-              </Select>
-            </Field>
-            <Field label="Button label" htmlFor="itCtaLabel">
-              <Input id="itCtaLabel" value={text("ctaLabel")} onChange={(e) => set("ctaLabel", e.target.value)} />
-            </Field>
-          </div>
-          <Field label="Button link" htmlFor="itCtaHref">
-            <Input id="itCtaHref" value={text("ctaHref")} onChange={(e) => set("ctaHref", e.target.value)} />
-          </Field>
+          <button type="button" onClick={() => setMore((m) => !m)} className="text-[11.5px] text-ink-500 underline">{more ? "Hide" : "Focal point, overlay, mobile crop"}</button>
+          {more && (
+            <div className="space-y-2 rounded-md border border-ink-200 p-2.5">
+              <div className="relative overflow-hidden rounded" style={{ aspectRatio: "16 / 9" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={media.url} alt="" className="size-full object-cover" style={{ objectPosition: `${media.focalX}% ${media.focalY}%` }} />
+                <button
+                  type="button"
+                  className="absolute inset-0 cursor-crosshair"
+                  aria-label="Set focal point"
+                  onClick={(e) => {
+                    const r = e.currentTarget.getBoundingClientRect();
+                    patch({ focalX: Math.round(((e.clientX - r.left) / r.width) * 100), focalY: Math.round(((e.clientY - r.top) / r.height) * 100) });
+                  }}
+                />
+                <span className="pointer-events-none absolute size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow" style={{ left: `${media.focalX}%`, top: `${media.focalY}%`, background: "rgba(14,124,102,.8)" }} />
+              </div>
+              <p className="text-[11px] text-ink-400">Click the image to set the focal point ({media.focalX}%, {media.focalY}%). Crops keep this point visible.</p>
+              <Field label={`Darken overlay (${media.overlay}%)`} htmlFor={`ov-${label}`}>
+                <input id={`ov-${label}`} type="range" min={0} max={90} value={media.overlay} onChange={(e) => patch({ overlay: Number(e.target.value) })} className="w-full accent-[var(--color-pine-600)]" />
+              </Field>
+              <Field label="Different image on phones" hint="Optional portrait crop.">
+                <ImageField value={media.mobileUrl} onChange={(mobileUrl) => patch({ mobileUrl })} />
+              </Field>
+            </div>
+          )}
         </>
-      )}
-
-      {type === "customBanner" && (
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Button label" htmlFor="bannerCta">
-            <Input id="bannerCta" value={text("ctaLabel")} onChange={(e) => set("ctaLabel", e.target.value)} />
-          </Field>
-          <Field label="Button link" htmlFor="bannerHref">
-            <Input id="bannerHref" value={text("ctaHref")} onChange={(e) => set("ctaHref", e.target.value)} />
-          </Field>
-        </div>
-      )}
-
-      {type === "benefits" && (
-        <RepeatableList
-          label="Benefits"
-          items={(config.items as Array<{ title: string; body: string }>) ?? []}
-          onChange={(items) => set("items", items)}
-          blank={{ title: "", body: "" }}
-          fields={[
-            { key: "title", label: "Title" },
-            { key: "body", label: "Description", multiline: true },
-          ]}
-        />
-      )}
-
-      {type === "testimonials" && (
-        <>
-          <div className="rounded-md border border-ink-200 bg-ink-50 px-2.5 py-2 text-[11.5px] text-ink-600">
-            Only add quotes real customers actually gave you. This section stays hidden on your live
-            store while it is empty.
-          </div>
-          <RepeatableList
-            label="Testimonials"
-            items={(config.items as Array<{ quote: string; author: string; role: string }>) ?? []}
-            onChange={(items) => set("items", items)}
-            blank={{ quote: "", author: "", role: "" }}
-            fields={[
-              { key: "quote", label: "Quote", multiline: true },
-              { key: "author", label: "Name" },
-              { key: "role", label: "Role or location" },
-            ]}
-          />
-        </>
-      )}
-
-      {type === "faq" && (
-        <RepeatableList
-          label="Questions"
-          items={(config.items as Array<{ q: string; a: string }>) ?? []}
-          onChange={(items) => set("items", items)}
-          blank={{ q: "", a: "" }}
-          fields={[
-            { key: "q", label: "Question" },
-            { key: "a", label: "Answer", multiline: true },
-          ]}
-        />
-      )}
-
-      {type === "reviews" && (
-        <>
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="How many" htmlFor="reviewLimit">
-              <Input id="reviewLimit" type="number" min="1" max="12" value={num("limit", 3)} onChange={(e) => set("limit", Number(e.target.value))} />
-            </Field>
-            <Field label="Minimum rating" htmlFor="minRating">
-              <Select id="minRating" value={String(num("minRating", 4))} onChange={(e) => set("minRating", Number(e.target.value))}>
-                {[1, 2, 3, 4, 5].map((rating) => (
-                  <option key={rating} value={rating}>{rating} stars and up</option>
-                ))}
-              </Select>
-            </Field>
-          </div>
-          <p className="text-[11.5px] text-ink-400">
-            Pulls real published reviews from your catalog. Nothing is invented.
-          </p>
-        </>
-      )}
-
-      {type === "newsletter" && (
-        <>
-          <Field label="Body" htmlFor="newsletterBody">
-            <Textarea id="newsletterBody" rows={2} value={text("body")} onChange={(e) => set("body", e.target.value)} />
-          </Field>
-          <Field label="Button label" htmlFor="buttonLabel">
-            <Input id="buttonLabel" value={text("buttonLabel")} onChange={(e) => set("buttonLabel", e.target.value)} />
-          </Field>
-        </>
-      )}
-
-      {type !== "announcement" && (
-        <div className="grid grid-cols-2 gap-2 border-t border-ink-200 pt-3">
-          <Field label="Background" htmlFor="background">
-            <Select id="background" value={text("background") || "white"} onChange={(e) => set("background", e.target.value)}>
-              <option value="white">White</option>
-              <option value="muted">Light grey</option>
-              <option value="brand">Brand colour</option>
-              <option value="ink">Dark</option>
-            </Select>
-          </Field>
-          <Field label="Spacing" htmlFor="spacing">
-            <Select id="spacing" value={text("spacing") || "normal"} onChange={(e) => set("spacing", e.target.value)}>
-              <option value="compact">Compact</option>
-              <option value="normal">Normal</option>
-              <option value="roomy">Roomy</option>
-            </Select>
-          </Field>
-        </div>
       )}
     </div>
   );
 }
 
-function RepeatableList<T extends Record<string, string>>({
-  label, items, onChange, blank, fields,
-}: {
-  label: string;
-  items: T[];
-  onChange: (items: T[]) => void;
-  blank: T;
-  fields: Array<{ key: keyof T & string; label: string; multiline?: boolean }>;
-}) {
+/** Blocks: typed repeatable items with add / remove / duplicate / reorder. */
+function BlocksList({ field, items, onChange, ctx }: { field: Extract<FieldSpec, { type: "items" }>; items: Config[]; onChange: (items: Config[]) => void; ctx: Ctx }) {
+  const blank = Object.fromEntries(field.fields.map((f) => [f.key, f.type === "media" ? { url: null, alt: "", focalX: 50, focalY: 50, overlay: 0, mobileUrl: null } : f.type === "select" ? f.options[0]?.value ?? "" : ""]));
+  const max = field.max ?? 12;
+  const move = (from: number, to: number) => {
+    if (to < 0 || to >= items.length) return;
+    const next = [...items];
+    const [it] = next.splice(from, 1);
+    next.splice(to, 0, it);
+    onChange(next);
+  };
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between">
-        <Label className="mb-0">{label}</Label>
-        <Button size="sm" variant="ghost" onClick={() => onChange([...items, { ...blank }])}>
+        <Label className="mb-0">{field.label} <span className="font-normal text-ink-400">({items.length}/{max})</span></Label>
+        <Button size="sm" variant="ghost" disabled={items.length >= max} onClick={() => onChange([...items, { ...blank }])}>
           <Plus />
-          Add
+          Add {field.itemLabel.toLowerCase()}
         </Button>
       </div>
+      {field.hint && <p className="mb-2 rounded-md border border-ink-200 bg-ink-50 px-2.5 py-2 text-[11.5px] text-ink-600">{field.hint}</p>}
       <div className="space-y-2">
         {items.length === 0 && (
-          <p className="rounded-md border border-dashed border-ink-300 px-3 py-3 text-center text-[12px] text-ink-400">
-            Nothing yet.
-          </p>
+          <p className="rounded-md border border-dashed border-ink-300 px-3 py-3 text-center text-[12px] text-ink-400">No {field.itemLabel.toLowerCase()}s yet.</p>
         )}
         {items.map((item, index) => (
           <div key={index} className="rounded-md border border-ink-200 p-2.5">
             <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-ink-400">
-                {index + 1}
-              </span>
-              <button
-                type="button"
-                onClick={() => onChange(items.filter((_, i) => i !== index))}
-                className="rounded p-1 text-ink-400 hover:bg-ink-100 hover:text-[var(--color-signal-negative)]"
-                aria-label={`Remove item ${index + 1}`}
-              >
-                <Trash2 className="size-3" />
-              </button>
+              <span className="text-[11px] font-medium uppercase tracking-wide text-ink-400">{field.itemLabel} {index + 1}</span>
+              <div className="flex gap-0.5">
+                <IconButton label="Move up" onClick={() => move(index, index - 1)} disabled={index === 0}><ArrowUp className="size-3" /></IconButton>
+                <IconButton label="Move down" onClick={() => move(index, index + 1)} disabled={index === items.length - 1}><ArrowDown className="size-3" /></IconButton>
+                <IconButton label="Duplicate" onClick={() => { if (items.length >= max) return; const next = [...items]; next.splice(index + 1, 0, JSON.parse(JSON.stringify(item))); onChange(next); }} disabled={items.length >= max}><Copy className="size-3" /></IconButton>
+                <IconButton label={`Remove ${field.itemLabel.toLowerCase()} ${index + 1}`} onClick={() => onChange(items.filter((_, i) => i !== index))} danger><Trash2 className="size-3" /></IconButton>
+              </div>
             </div>
             <div className="space-y-2">
-              {fields.map((field) =>
-                field.multiline ? (
-                  <Textarea
-                    key={field.key}
-                    rows={2}
-                    value={item[field.key] ?? ""}
-                    placeholder={field.label}
-                    aria-label={field.label}
-                    onChange={(event) =>
-                      onChange(items.map((entry, i) => (i === index ? { ...entry, [field.key]: event.target.value } : entry)))
-                    }
-                    className="text-[12.5px]"
-                  />
-                ) : (
-                  <Input
-                    key={field.key}
-                    value={item[field.key] ?? ""}
-                    placeholder={field.label}
-                    aria-label={field.label}
-                    onChange={(event) =>
-                      onChange(items.map((entry, i) => (i === index ? { ...entry, [field.key]: event.target.value } : entry)))
-                    }
-                    className="h-8 text-[12.5px]"
-                  />
-                ),
-              )}
+              {field.fields.map((sub) => (
+                <FieldControl key={sub.key} field={sub} value={item[sub.key]} onChange={(v) => onChange(items.map((entry, i) => (i === index ? { ...entry, [sub.key]: v } : entry)))} ctx={ctx} />
+              ))}
             </div>
           </div>
         ))}
       </div>
     </div>
+  );
+}
+
+function IconButton({ label, onClick, disabled, danger, children }: { label: string; onClick: () => void; disabled?: boolean; danger?: boolean; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} aria-label={label} title={label} className={cn("rounded p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-800 disabled:opacity-30", danger && "hover:text-[var(--color-signal-negative)]")}>
+      {children}
+    </button>
   );
 }

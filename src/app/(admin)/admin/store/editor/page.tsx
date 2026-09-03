@@ -7,6 +7,8 @@ import { getEditablePage } from "@/lib/services/pages";
 import { isAIConfigured } from "@/lib/ai/config";
 import { can } from "@/lib/permissions";
 import { StoreEditor, type EditorSection } from "@/components/admin/store-editor";
+import { listDesignSnapshots } from "@/lib/services/snapshots";
+import { resolveTheme } from "@/lib/storefront/theme";
 
 export const metadata: Metadata = { title: "Store editor" };
 export const dynamic = "force-dynamic";
@@ -25,9 +27,9 @@ export default async function StoreEditorPage({
     : await prisma.page.findFirst({ where: { storeId: ctx.storeId, type: "HOME" } });
   if (!page) notFound();
 
-  const [editable, store, collections, products, aiConfigured] = await Promise.all([
+  const [editable, store, collections, products, aiConfigured, snapshots] = await Promise.all([
     getEditablePage(ctx, page.id),
-    prisma.store.findUniqueOrThrow({ where: { id: ctx.storeId }, select: { slug: true } }),
+    prisma.store.findUniqueOrThrow({ where: { id: ctx.storeId }, select: { slug: true, theme: true, primaryColor: true, secondaryColor: true } }),
     prisma.collection.findMany({
       where: { storeId: ctx.storeId, visible: true },
       select: { slug: true, title: true },
@@ -40,7 +42,9 @@ export default async function StoreEditorPage({
       take: 200,
     }),
     isAIConfigured(ctx.storeId),
+    listDesignSnapshots(ctx),
   ]);
+  const theme = resolveTheme({ theme: store.theme, primaryColor: store.primaryColor, secondaryColor: store.secondaryColor });
 
   return (
     <div className="-mx-4 -my-5 sm:-mx-6 sm:-my-6">
@@ -54,6 +58,8 @@ export default async function StoreEditorPage({
         products={products}
         aiConfigured={aiConfigured}
         canWrite={can(auth.role, "storefront:write")}
+        theme={{ dna: theme.dna, direction: theme.direction, motion: theme.motion, cards: theme.cards, schemes: theme.schemes.map((s) => ({ id: s.id, name: s.name })) }}
+        snapshots={snapshots.map((s) => ({ ...s, createdAt: s.createdAt.toISOString() }))}
       />
     </div>
   );

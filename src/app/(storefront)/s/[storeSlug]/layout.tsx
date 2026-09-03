@@ -7,6 +7,7 @@ import { StorefrontHeader } from "@/components/storefront/header";
 import { StorefrontFooter } from "@/components/storefront/footer";
 import { StorefrontAnalytics } from "@/components/storefront/analytics";
 import { CartProvider } from "@/components/storefront/cart-provider";
+import { RevealObserver } from "@/components/storefront/motion";
 import { googleFontsHref } from "@/lib/storefront/theme";
 
 export const dynamic = "force-dynamic";
@@ -35,18 +36,23 @@ export default async function StorefrontLayout({
   const store = await getStore(storeSlug);
   const [cart, sessionId] = await Promise.all([getCartView(store.id), getStorefrontSessionId()]);
   const fontsHref = googleFontsHref(store.theme);
+  const { theme } = store;
 
   return (
     <div
-      data-motion={store.theme.motion}
-      data-card={store.theme.cardStyle}
-      data-header={store.theme.header}
+      data-motion={theme.motion}
+      data-card={theme.cardStyle}
+      data-card-hover={theme.cards.hover}
+      data-card-align={theme.cards.align}
+      data-btn-hover={theme.buttons.hover}
+      data-header={theme.header.style}
+      data-nav-upper={theme.header.navUppercase ? "true" : undefined}
       className="st-root flex min-h-dvh flex-col"
       style={
         {
           "--store-primary": store.primaryColor,
           "--store-secondary": store.secondaryColor,
-          ...store.theme.vars,
+          ...theme.vars,
         } as React.CSSProperties
       }
     >
@@ -59,6 +65,9 @@ export default async function StorefrontLayout({
           <link rel="stylesheet" href={fontsHref} />
         </>
       )}
+      {/* Scoped custom CSS: sanitised and nested under .st-root (see custom-css.ts). */}
+      {theme.customCss && <style dangerouslySetInnerHTML={{ __html: theme.customCss }} />}
+      <RevealObserver />
       <Suspense>
         <StorefrontAnalytics storeSlug={storeSlug} sessionId={sessionId}>
           <CartProvider storeSlug={storeSlug} initialCart={cart}>
@@ -66,7 +75,7 @@ export default async function StorefrontLayout({
             {store.status === "DRAFT" ? (
               <div
                 role="status"
-                className="border-b border-sky-200 bg-sky-50 px-4 py-2.5 text-center text-[13px] text-sky-900"
+                className="relative z-50 border-b border-sky-200 bg-sky-50 px-4 py-2.5 text-center text-[13px] text-sky-900"
               >
                 Draft preview — only you can see this store. Set it live from Store settings
                 when you&apos;re ready to share it.
@@ -74,13 +83,13 @@ export default async function StorefrontLayout({
             ) : store.status !== "ACTIVE" ? (
               <div
                 role="status"
-                className="border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-center text-[13px] text-amber-900"
+                className="relative z-50 border-b border-amber-200 bg-amber-50 px-4 py-2.5 text-center text-[13px] text-amber-900"
               >
                 {store.name} is not accepting orders at the moment. You can still browse —
                 checkout will reopen when the store does.
               </div>
             ) : null}
-            <main className="flex-1">{children}</main>
+            <main className="st-main flex-1">{children}</main>
             <StorefrontFooter store={store} />
           </CartProvider>
         </StorefrontAnalytics>

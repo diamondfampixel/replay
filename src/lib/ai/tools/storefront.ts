@@ -9,8 +9,11 @@ import {
 import {
   BUTTON_SHAPES, BUTTON_STYLES, CARD_STYLES, DENSITIES, DESIGN_DIRECTIONS, DIRECTION_PRESETS,
   FONT_KEYS, HEADER_STYLES, HEADING_TRANSFORMS, IMAGE_RATIOS, MOTION_LEVELS, NEUTRAL_TEMPS, RADII,
+  buttonsSchema, cardsSchema, collectionSchema, colorRolesSchema, footerSchema, headerSchema, layoutSchema,
+  motionSchema, productSchema, shapeSchema, surfaceSchema, typographySchema,
 } from "@/lib/storefront/theme";
 import { applyStoreTheme, describeDirection, getStoreTheme } from "@/lib/storefront/design";
+import { createDesignSnapshot } from "@/lib/services/snapshots";
 import { sanitizeHtml } from "@/lib/sanitize";
 
 async function findPage(storeId: string, page: string) {
@@ -526,7 +529,7 @@ export const storefrontTools = [
       "Give the whole storefront a coordinated new look by choosing a design direction. Each direction moves typography, shape, spacing, colour treatment, product cards and motion together — this is how you answer 'make it feel like a luxury label' or 'make it fun and playful'. Optionally set an accent colour (hex). This replaces the current look; use update_store_design to fine-tune afterwards.",
     schema: z.object({
       direction: z.enum(DESIGN_DIRECTIONS).describe(
-        "modern (clean, neutral), editorial (serif, spacious), minimal (stripped-back), bold (heavy, energetic), luxury (high-contrast serif, restrained), playful (round, bright), technical (grotesk + mono, precise), organic (warm, soft)",
+        "modern (clean, neutral), editorial (serif, spacious), minimal (stripped-back), bold (heavy, energetic), luxury (high-contrast serif, restrained), playful (round, bright), technical (grotesk + mono, precise), organic (warm, soft), energy (big type, dark, motion), creator (oversized type, unconventional)",
       ),
       accent: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe("Brand accent colour as a 6-digit hex, e.g. #1a1a1a"),
     }),
@@ -541,14 +544,15 @@ export const storefrontTools = [
       };
     },
     async execute(input, ctx) {
-      const before = await getStoreTheme(ctx.storeId);
+      // A direction switch is a whole new look: snapshot first so it is one click back.
+      const snapshot = await createDesignSnapshot(ctx, { label: `Before AI redesign (${DIRECTION_PRESETS[input.direction].label})`, source: "ai" });
       const next = await applyStoreTheme(ctx.storeId, { direction: input.direction, accent: input.accent });
       await audit(ctx, "store.design.direction", { type: "Store", id: ctx.storeId }, { direction: input.direction });
       return {
-        summary: `Storefront redesigned as "${DIRECTION_PRESETS[input.direction].label}".`,
-        data: { theme: next },
+        summary: `Storefront redesigned as "${DIRECTION_PRESETS[input.direction].label}". Follow up with compose_page if the homepage should be recomposed to match.`,
+        data: { theme: next, snapshotId: snapshot.id },
         links: [{ label: "View store", href: "/admin/store" }, { label: "Store editor", href: "/admin/store/editor" }],
-        undo: { tool: "update_store_design", params: before as Record<string, unknown> },
+        undo: { tool: "restore_design_snapshot", params: { snapshotId: snapshot.id } },
       };
     },
   }),
@@ -556,8 +560,20 @@ export const storefrontTools = [
   defineTool({
     name: "update_store_design",
     description:
-      "Fine-tune individual design tokens of the storefront without changing its whole direction — for requests like 'make the corners rounder', 'use a warmer background', 'make the buttons pill-shaped', 'more whitespace', 'bigger product images', or 'switch to a serif headline font'. Only the tokens you pass change.",
+      "Fine-tune the storefront design without changing its whole direction — corners, fonts, whitespace, button shape, card style, image ratio, header/footer layout, product page layout and block order, collection grid, motion, colour roles. Pass flat keys for quick tweaks or the grouped objects (typography, layout, shape, surface, buttons, cards, headerConfig, footer, product, collection, motionConfig, colors) for precise control. Only what you pass changes.",
     schema: z.object({
+      colors: colorRolesSchema.optional().describe("Colour roles as hex: primary, secondary, background, foreground, muted, border, link, sale, button, buttonText"),
+      typography: typographySchema.optional(),
+      layout: layoutSchema.optional().describe("width narrow|standard|wide|full, sectionSpacing tight|normal|airy, gridGap sm|md|lg, density"),
+      shape: shapeSchema.optional(),
+      surface: surfaceSchema.optional(),
+      buttons: buttonsSchema.optional(),
+      cards: cardsSchema.optional(),
+      headerConfig: headerSchema.optional().describe("style classic|centered|split|minimal|transparent, sticky, logoSize, showSearch, border, navUppercase"),
+      footer: footerSchema.optional().describe("style columns|minimal|centered|brand, scheme, showNewsletter, brandStatement"),
+      product: productSchema.optional().describe("layout mediaLeft|gallery|stacked|stickyInfo|minimal|immersive, blocks order, trustItems, showReviews, showRecommended"),
+      collection: collectionSchema.optional(),
+      motionConfig: motionSchema.optional().describe("level off|subtle|balanced|expressive, reveal, stagger, parallax, imageZoom, marqueeSpeed"),
       fontDisplay: z.enum(FONT_KEYS).optional().describe("Heading font"),
       fontBody: z.enum(FONT_KEYS).optional().describe("Body font"),
       radius: z.enum(RADII).optional().describe("Corner roundness: none | xs | sm | md | lg | xl | pill"),
@@ -567,9 +583,9 @@ export const storefrontTools = [
       cardStyle: z.enum(CARD_STYLES).optional().describe("minimal | framed | editorial | elevated"),
       imageRatio: z.enum(IMAGE_RATIOS).optional().describe("Product image shape: square | portrait | landscape | tall"),
       headingTransform: z.enum(HEADING_TRANSFORMS).optional().describe("none | uppercase"),
-      neutral: z.enum(NEUTRAL_TEMPS).optional().describe("Background temperature: warm | cool | pure | sand | slate"),
-      motion: z.enum(MOTION_LEVELS).optional().describe("none | subtle | expressive"),
-      header: z.enum(HEADER_STYLES).optional().describe("classic | centered | minimal"),
+      neutral: z.enum(NEUTRAL_TEMPS).optional().describe("Background temperature: warm | cool | pure | sand | slate | ink (dark) | midnight (dark)"),
+      motion: z.enum(MOTION_LEVELS).optional().describe("off | subtle | balanced | expressive"),
+      header: z.enum(HEADER_STYLES).optional().describe("classic | centered | split | minimal | transparent"),
       accent: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe("Accent colour hex"),
     }),
     risk: "high",
@@ -579,13 +595,20 @@ export const storefrontTools = [
       return {
         title: "Adjust the storefront design?",
         description: "Fine-tunes the current look; the rest of the design stays as it is.",
-        details: keys.map(([k, v]) => `${k}: ${v}`),
+        details: keys.map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`),
         confirmLabel: "Apply changes",
       };
     },
     async execute(input, ctx) {
       const before = await getStoreTheme(ctx.storeId);
       const patch = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined));
+      // Grouped keys merge into the stored group rather than replacing it.
+      for (const key of Object.keys(patch)) {
+        const current = (before as Record<string, unknown>)[key];
+        if (current && typeof current === "object" && !Array.isArray(current) && patch[key] && typeof patch[key] === "object" && !Array.isArray(patch[key])) {
+          patch[key] = { ...(current as Record<string, unknown>), ...(patch[key] as Record<string, unknown>) };
+        }
+      }
       const next = await applyStoreTheme(ctx.storeId, patch);
       await audit(ctx, "store.design.update", { type: "Store", id: ctx.storeId }, { keys: Object.keys(patch) });
       return {

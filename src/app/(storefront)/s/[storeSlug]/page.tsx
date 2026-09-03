@@ -49,7 +49,7 @@ export default async function StorefrontHome({
 
   return (
     <>
-      {sections.map((section) => {
+      {sections.map((section, index) => {
         let config = (section.config ?? {}) as Record<string, unknown>;
         for (const assignment of assignments) {
           if (experimentSections.get(assignment.experimentId) === section.id) {
@@ -61,6 +61,7 @@ export default async function StorefrontHome({
             key={section.id}
             store={store}
             section={{ id: section.id, type: section.type, visible: true, config }}
+            index={index}
           />
         );
       })}

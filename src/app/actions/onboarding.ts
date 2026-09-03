@@ -9,6 +9,8 @@ import { provisionOrganization, ensureHomepage } from "@/lib/services/provision"
 import { applyGeneratedStore, generateStoreConfig } from "@/lib/ai/store-builder";
 import { seedDemoStore } from "@/lib/demo/seed-store";
 import { DEMO_CONTENT_PAGES } from "@/lib/demo/storefront-pages";
+import { DIRECTION_PRESETS, resolveTheme } from "@/lib/storefront/theme";
+import { applyDnaMove, dnaSchema } from "@/lib/storefront/dna";
 
 /**
  * Creates the caller's first organization + store. When `seedDemoProducts` is
@@ -38,6 +40,13 @@ export async function completeOnboardingAction(payload: unknown) {
       contactEmail: input.contactEmail || null,
       isDemo: input.seedDemoProducts,
     });
+
+    // The brand's Design DNA: the chosen direction, bent by the "feel" chips.
+    let dna = dnaSchema.parse(DIRECTION_PRESETS[input.direction].dna);
+    for (const move of input.feel) dna = applyDnaMove(dna, move);
+    const storedTheme = { direction: input.direction, accent: input.primaryColor, ...(input.feel.length ? { dna } : {}) };
+    await prisma.store.update({ where: { id: store.id }, data: { theme: storedTheme } });
+    const theme = resolveTheme({ theme: storedTheme, primaryColor: input.primaryColor, secondaryColor: input.secondaryColor });
 
     if (input.seedDemoProducts) {
       await seedDemoStore(prisma, store.id, {
@@ -72,7 +81,7 @@ export async function completeOnboardingAction(payload: unknown) {
     });
 
     await ensureHomepage(prisma, store.id);
-    const generated = await generateStoreConfig(store.id, input);
+    const generated = await generateStoreConfig(store.id, input, { theme });
     await applyGeneratedStore(prisma, store.id, generated);
 
     return ok({ storeId: store.id, generatedBy: generated.source });

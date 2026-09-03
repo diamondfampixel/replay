@@ -10,9 +10,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
-  AESTHETICS, BRAND_PERSONALITIES, HOMEPAGE_SECTION_CHOICES, INDUSTRIES,
+  BRAND_PERSONALITIES, FEEL_CHOICES, HOMEPAGE_SECTION_CHOICES, INDUSTRIES,
   type OnboardingInput,
 } from "@/lib/validation/onboarding";
+import { DESIGN_DIRECTIONS, DIRECTION_PRESETS, FONTS } from "@/lib/storefront/theme";
 import { completeOnboardingAction } from "@/app/actions/onboarding";
 
 const STEPS = ["Business", "Audience", "Brand", "Homepage", "Finish"] as const;
@@ -39,6 +40,8 @@ export function OnboardingWizard({ aiConfigured }: { aiConfigured: boolean }) {
     targetCustomer: "",
     brandPersonality: "",
     aesthetic: "editorial",
+    direction: "modern",
+    feel: [],
     primaryColor: "#0E7C66",
     secondaryColor: "#1A1A17",
     contactEmail: "",
@@ -223,24 +226,51 @@ export function OnboardingWizard({ aiConfigured }: { aiConfigured: boolean }) {
           {step === 2 && (
             <div className="space-y-5">
               <div>
-                <p className="mb-2 text-[13px] font-medium text-ink-700">Preferred aesthetic</p>
+                <p className="mb-1 text-[13px] font-medium text-ink-700">What should your brand feel like?</p>
+                <p className="mb-2 text-[12px] text-ink-500">Pick a design direction. It sets your store&apos;s Design DNA — typography, shape, spacing, motion — and you can change every part of it later.</p>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  {AESTHETICS.map((aesthetic) => (
-                    <button
-                      key={aesthetic.id}
-                      type="button"
-                      onClick={() => set("aesthetic", aesthetic.id)}
-                      className={cn(
-                        "rounded-lg border p-3 text-left transition-colors",
-                        form.aesthetic === aesthetic.id
-                          ? "border-ink-900 bg-ink-50"
-                          : "border-ink-200 bg-white hover:bg-ink-50",
-                      )}
-                    >
-                      <p className="text-[13px] font-medium text-ink-900">{aesthetic.label}</p>
-                      <p className="mt-0.5 text-[12px] text-ink-500">{aesthetic.description}</p>
-                    </button>
-                  ))}
+                  {DESIGN_DIRECTIONS.map((direction) => {
+                    const preset = DIRECTION_PRESETS[direction];
+                    return (
+                      <button
+                        key={direction}
+                        type="button"
+                        onClick={() => set("direction", direction)}
+                        aria-pressed={form.direction === direction}
+                        className={cn(
+                          "rounded-lg border p-3 text-left transition-colors",
+                          form.direction === direction ? "border-ink-900 bg-ink-50" : "border-ink-200 bg-white hover:bg-ink-50",
+                        )}
+                      >
+                        <p className="text-[13px] font-medium text-ink-900">{preset.label}</p>
+                        <p className="mt-0.5 text-[12px] text-ink-500">{preset.blurb}</p>
+                        <p className="mt-1 text-[11px] text-ink-400">{FONTS[preset.fontDisplay].family} + {FONTS[preset.fontBody].family}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-1 text-[13px] font-medium text-ink-700">Nudge the character <span className="font-normal text-ink-400">(up to three)</span></p>
+                <div className="flex flex-wrap gap-1.5">
+                  {FEEL_CHOICES.map((feel) => {
+                    const active = form.feel.includes(feel.id);
+                    return (
+                      <button
+                        key={feel.id}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => set("feel", active ? form.feel.filter((f) => f !== feel.id) : form.feel.length >= 3 ? form.feel : [...form.feel, feel.id])}
+                        className={cn(
+                          "rounded-full border px-3 py-1.5 text-[12.5px] transition-colors",
+                          active ? "border-ink-900 bg-ink-900 text-white" : "border-ink-200 bg-white text-ink-600 hover:bg-ink-50",
+                        )}
+                      >
+                        {feel.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

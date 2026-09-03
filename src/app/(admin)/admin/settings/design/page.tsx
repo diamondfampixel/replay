@@ -11,7 +11,7 @@ export default async function DesignSettingsPage() {
   const ctx = await requireCapability("settings:read");
   const store = await prisma.store.findUniqueOrThrow({
     where: { id: ctx.storeId },
-    select: { theme: true, primaryColor: true, slug: true },
+    select: { theme: true, primaryColor: true, secondaryColor: true, slug: true },
   });
   const parsed = storeThemeSchema.safeParse(store.theme ?? {});
   const theme = parsed.success ? parsed.data : storeThemeSchema.parse({});
@@ -20,6 +20,7 @@ export default async function DesignSettingsPage() {
     <DesignSettingsForm
       initial={theme}
       primaryColor={store.primaryColor}
+      secondaryColor={store.secondaryColor}
       storeSlug={store.slug}
       canWrite={can(ctx.role, "settings:write")}
     />

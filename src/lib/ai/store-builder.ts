@@ -4,7 +4,10 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { getAIConfig } from "@/lib/ai/config";
 import { createAnthropic, extractJson } from "@/lib/ai/client";
-import { SECTION_TYPES, normaliseSectionConfig } from "@/lib/storefront/sections";
+import { SECTION_META, SECTION_TYPES, normaliseSectionConfig } from "@/lib/storefront/sections";
+import { describeSectionFields } from "@/lib/storefront/section-fields";
+import { composeHomepage, type ThemeLike } from "@/lib/storefront/compose";
+import { DIRECTION_PRESETS, resolveTheme } from "@/lib/storefront/theme";
 import type { OnboardingInput } from "@/lib/validation/onboarding";
 
 const generatedSectionSchema = z.object({
@@ -26,102 +29,38 @@ const SYSTEM_PROMPT = `You configure ecommerce storefront homepages for a platfo
 You never write code. You return JSON describing an ordered list of page sections
 that the platform's renderer already knows how to draw.
 
-Available section types and their configuration keys:
-- announcement: { text, link, background: "ink"|"brand"|"muted" }
-- hero: { headline, subheadline, ctaLabel, ctaHref, secondaryCtaLabel, secondaryCtaHref, align: "left"|"center", background: "muted"|"brand"|"white", height: "small"|"medium"|"large" }
-- imageHero: { headline, subheadline, ctaLabel, ctaHref, imageUrl, overlay: 0-80 }
-- featuredProducts: { heading, subheading, source: "collection"|"manual"|"bestsellers"|"newest", collectionSlug, limit: 2-8, layout: "grid"|"carousel" }
-- productGrid: { heading, limit, columns: 2|3|4 }
-- collectionGrid: { heading, collectionSlugs: string[] }
-- text: { heading, body, align }
-- imageText: { heading, body, ctaLabel, ctaHref, imagePosition: "left"|"right", imageUrl }
-- benefits: { heading, items: [{ title, body }] }
-- testimonials: { heading, items: [{ quote, author, role }] }
-- reviews: { heading, limit, minRating }
-- faq: { heading, items: [{ q, a }] }
-- newsletter: { heading, body, buttonLabel }
-- customBanner: { heading, body, ctaLabel, ctaHref, background }
+Available section types, their compositions ("layout") and configuration keys:
+${SECTION_TYPES.map((t) => `- ${t}${SECTION_META[t].layouts ? ` (layout: ${SECTION_META[t].layouts!.map((l) => l.id).join("|")})` : ""}: { ${describeSectionFields(t)} }`).join("\n")}
+Every section also accepts "design": { scheme: "base"|"muted"|"accent"|"contrast", width: "narrow"|"contained"|"wide"|"full", paddingTop/paddingBottom: "none"|"sm"|"md"|"lg"|"xl", align: "left"|"center"|"right" }.
 
 Rules:
 - Write specific, concrete copy for this business. No filler like "Lorem ipsum",
   no generic startup language, no exclamation marks.
-- Never invent customer testimonials or reviews as if they were real. If you use
-  a testimonials section, set items to an empty array so the operator adds real
-  quotes themselves.
+- Never invent customer testimonials, reviews, statistics or press logos. If you
+  use a testimonials section, set items to an empty array so the operator adds
+  real quotes themselves. Only claim benefits (free shipping, returns) that the
+  brief states.
+- Choose compositions that fit the brand's design direction and DNA given in
+  the brief: expressive brands get fullBleed/asymmetric heroes and asymmetric
+  product grids; restrained brands get editorial/minimal heroes and editorial
+  grids; playful brands get carousels and cards.
 - Keep headlines under 60 characters and subheadlines under 140.
 - Order sections so the page opens strongly and ends with a newsletter or FAQ.
 - Return ONLY JSON: { "tagline", "seoTitle", "seoDescription", "sections": [{ "type", "config" }] }`;
 
-function templateStore(input: OnboardingInput): GeneratedStore {
-  const wanted = new Set(input.sections.length ? input.sections : ["hero", "featuredProducts", "benefits", "newsletter"]);
-  const sections: Array<{ type: string; config: Record<string, unknown> }> = [];
-
-  if (wanted.has("announcement")) {
-    sections.push({ type: "announcement", config: { text: "Free shipping on orders over $75", link: "/shop", background: "ink" } });
-  }
-  sections.push({
-    type: "hero",
-    config: {
-      headline: input.businessName,
-      subheadline: input.description.slice(0, 140),
-      ctaLabel: "Shop now",
-      ctaHref: "/shop",
-      align: "left",
-      background: "muted",
-      height: "large",
+function templateStore(input: OnboardingInput, theme: ThemeLike, context?: BuilderContext): GeneratedStore {
+  const sections = composeHomepage(theme, {
+    name: input.businessName,
+    description: input.description,
+    industry: input.industry,
+    goal: "catalog",
+    catalog: {
+      productCount: context?.productTitles?.length ?? 0,
+      collectionSlugs: context?.collectionSlugs ?? [],
+      hasReviews: false,
     },
+    wanted: input.sections.length ? input.sections : ["hero", "featuredProducts", "imageText", "newsletter"],
   });
-  if (wanted.has("benefits")) {
-    sections.push({
-      type: "benefits",
-      config: {
-        items: [
-          { title: "Considered range", body: "A short list of products chosen carefully." },
-          { title: "Straightforward returns", body: "Thirty days, no forms to fill in." },
-          { title: "Real support", body: "A person answers, usually the same day." },
-        ],
-      },
-    });
-  }
-  if (wanted.has("featuredProducts")) {
-    sections.push({ type: "featuredProducts", config: { heading: "Featured", source: "newest", limit: 4, layout: "grid" } });
-  }
-  if (wanted.has("collectionGrid")) {
-    sections.push({ type: "collectionGrid", config: { heading: "Shop by collection", collectionSlugs: [] } });
-  }
-  if (wanted.has("imageText")) {
-    sections.push({
-      type: "imageText",
-      config: {
-        heading: `About ${input.businessName}`,
-        body: input.description,
-        ctaLabel: "Read more",
-        ctaHref: "/pages/about",
-        imagePosition: "right",
-      },
-    });
-  }
-  if (wanted.has("reviews")) {
-    sections.push({ type: "reviews", config: { heading: "What customers say", limit: 3, minRating: 4 } });
-  }
-  if (wanted.has("faq")) {
-    sections.push({
-      type: "faq",
-      config: {
-        heading: "Common questions",
-        items: [
-          { q: "How long does shipping take?", a: "Add your shipping timelines here." },
-          { q: "What is your return policy?", a: "Add your return policy here." },
-        ],
-      },
-    });
-  }
-  if (wanted.has("newsletter")) {
-    sections.push({
-      type: "newsletter",
-      config: { heading: "Stay in touch", body: "Occasional updates. No spam.", buttonLabel: "Subscribe" },
-    });
-  }
 
   return {
     tagline: input.description.slice(0, 120),
@@ -132,6 +71,8 @@ function templateStore(input: OnboardingInput): GeneratedStore {
   };
 }
 
+export type BuilderContext = { productTitles?: string[]; collectionSlugs?: string[]; theme?: ThemeLike };
+
 /**
  * Produces a homepage configuration for a new store. When an Anthropic key is
  * available the copy is generated; otherwise a deterministic template is used
@@ -140,10 +81,11 @@ function templateStore(input: OnboardingInput): GeneratedStore {
 export async function generateStoreConfig(
   storeId: string,
   input: OnboardingInput,
-  context?: { productTitles?: string[]; collectionSlugs?: string[] },
+  context?: BuilderContext,
 ): Promise<GeneratedStore> {
+  const theme: ThemeLike = context?.theme ?? resolveTheme({ theme: { direction: input.direction }, primaryColor: input.primaryColor });
   const config = await getAIConfig(storeId);
-  if (!config || !input.generateWithAI) return templateStore(input);
+  if (!config || !input.generateWithAI) return templateStore(input, theme, context);
 
   const wantedSections = input.sections.length
     ? input.sections.join(", ")
@@ -156,7 +98,8 @@ export async function generateStoreConfig(
     `Description: ${input.description}`,
     input.targetCustomer ? `Target customer: ${input.targetCustomer}` : null,
     input.brandPersonality ? `Brand personality: ${input.brandPersonality}` : null,
-    input.aesthetic ? `Preferred aesthetic: ${input.aesthetic}` : null,
+    `Design direction: ${DIRECTION_PRESETS[theme.direction].label} — ${DIRECTION_PRESETS[theme.direction].blurb}`,
+    `Design DNA (0–100): expression ${theme.dna.expression}, era ${theme.dna.era}, tone ${theme.dna.tone}, geometry ${theme.dna.geometry}, edge ${theme.dna.edge}, density ${theme.dna.density}, energy ${theme.dna.energy}`,
     `Brand colours: primary ${input.primaryColor}, secondary ${input.secondaryColor}`,
     `Requested homepage sections (in roughly this order): ${wantedSections}`,
     context?.productTitles?.length
@@ -187,12 +130,12 @@ export async function generateStoreConfig(
     const sections = parsed.sections.filter((section) =>
       SECTION_TYPES.includes(section.type as (typeof SECTION_TYPES)[number]),
     );
-    if (!sections.length) return templateStore(input);
+    if (!sections.length) return templateStore(input, theme, context);
 
     return { ...parsed, sections, source: "ai" };
   } catch (error) {
     console.error("[store-builder] generation failed, using template", error);
-    return templateStore(input);
+    return templateStore(input, theme, context);
   }
 }
 

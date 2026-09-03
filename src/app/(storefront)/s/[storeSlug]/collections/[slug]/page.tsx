@@ -4,8 +4,9 @@ import { prisma } from "@/lib/db";
 import { getStore } from "@/lib/storefront/data";
 import { getCollectionProducts } from "@/lib/services/collections";
 import { toNumber } from "@/lib/money";
-import { ProductCard } from "@/components/storefront/primitives";
+import { ProductCard, gridClass } from "@/components/storefront/primitives";
 import { StorefrontAnalytics } from "@/components/storefront/analytics";
+import { Media } from "@/components/storefront/media";
 
 export async function generateMetadata({
   params,
@@ -32,6 +33,7 @@ export default async function CollectionPage({
 }) {
   const { storeSlug, slug } = await params;
   const store = await getStore(storeSlug);
+  const col = store.theme.collection;
 
   const collection = await prisma.collection.findFirst({
     where: { storeId: store.id, slug, visible: true },
@@ -39,38 +41,48 @@ export default async function CollectionPage({
   if (!collection) notFound();
 
   const products = await getCollectionProducts(store.id, collection, { onlyActive: true, limit: 48 });
+  const count = col.showCount && (
+    <p className="st-muted mt-2 text-[13px]">{products.length} product{products.length === 1 ? "" : "s"}</p>
+  );
 
   return (
     <>
       <StorefrontAnalytics storeSlug={storeSlug} type="collection_view" collectionId={collection.id} />
-      <div className="mx-auto max-w-6xl px-5 py-10">
-        {collection.imageUrl && (
-          <div className="mb-8 aspect-[3/1] overflow-hidden rounded-lg bg-ink-100">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={collection.imageUrl} alt="" className="size-full object-cover" />
+      {col.hero === "banner" && collection.imageUrl && (
+        <div className="relative min-h-[40vh] overflow-hidden" style={{ background: "var(--st-contrast-bg)" }}>
+          <Media media={{ url: collection.imageUrl, alt: "", focalX: 50, focalY: 50, overlay: 45, mobileUrl: null }} fill lazy={false} />
+          <div className="relative mx-auto flex min-h-[40vh] flex-col justify-end px-5 py-10 text-white sm:px-7" style={{ maxWidth: "var(--st-max-width)" }}>
+            <h1 className="st-heading-transform st-h-xl max-w-2xl">{collection.title}</h1>
+            {collection.description && <p className="st-lead mt-3 max-w-xl" style={{ color: "rgba(255,255,255,0.86)" }}>{collection.description}</p>}
           </div>
+        </div>
+      )}
+      <div className="mx-auto px-5 py-10 sm:px-7" style={{ maxWidth: "var(--st-max-width)" }}>
+        {col.hero === "banner" && collection.imageUrl ? (
+          <div className="mb-8">{count}</div>
+        ) : col.hero === "none" ? (
+          <header className="mb-6"><h1 className="sr-only">{collection.title}</h1>{count}</header>
+        ) : (
+          <header className="mb-8 max-w-2xl">
+            <h1 className="st-heading-transform st-h-lg">{collection.title}</h1>
+            {collection.description && <p className="st-muted st-lead mt-3">{collection.description}</p>}
+            {count}
+          </header>
         )}
-        <header className="mb-8 max-w-2xl">
-          <h1 className="text-[28px] font-semibold tracking-[-0.02em] text-ink-900">{collection.title}</h1>
-          {collection.description && (
-            <p className="mt-2 text-[14.5px] leading-relaxed text-ink-600">{collection.description}</p>
-          )}
-          <p className="mt-2 text-[13px] text-ink-400">
-            {products.length} product{products.length === 1 ? "" : "s"}
-          </p>
-        </header>
 
         {products.length === 0 ? (
-          <p className="rounded-md border border-dashed border-ink-300 px-4 py-16 text-center text-[14px] text-ink-500">
+          <p className="st-radius st-muted border border-dashed px-4 py-16 text-center text-[14px]" style={{ borderColor: "var(--st-border-strong)" }}>
             Nothing in this collection yet.
           </p>
         ) : (
-          <div className="grid grid-cols-2 gap-x-5 gap-y-9 sm:grid-cols-3 lg:grid-cols-4">
+          <div className={gridClass(col.columns, col.mobileColumns)} style={{ "--st-image-ratio": "var(--st-collection-ratio, var(--st-image-ratio))" } as React.CSSProperties}>
             {products.map((product) => (
               <ProductCard
                 key={product.id}
                 storeSlug={storeSlug}
                 currency={store.currency}
+                showRating={store.theme.cards.showRating}
+                priceEmphasis={store.theme.cards.priceEmphasis}
                 product={{
                   id: product.id,
                   slug: product.slug,

@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { prisma, type Prisma } from "@/lib/db";
 import { getStore } from "@/lib/storefront/data";
 import { toNumber } from "@/lib/money";
-import { ProductCard } from "@/components/storefront/primitives";
+import { ProductCard, gridClass } from "@/components/storefront/primitives";
 import { StorefrontFilters } from "@/components/storefront/filters";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Shop" };
 
@@ -24,6 +25,7 @@ export default async function ShopPage({
   const { storeSlug } = await params;
   const query = await searchParams;
   const store = await getStore(storeSlug);
+  const col = store.theme.collection;
 
   const where: Prisma.ProductWhereInput = { storeId: store.id, status: "ACTIVE" };
   if (query.category) where.category = { slug: query.category };
@@ -73,39 +75,38 @@ export default async function ShopPage({
     reviewCount: 0,
   }));
 
+  // With a filter sidebar the grid has less room, so it drops one column.
+  const columns = col.showFilters ? Math.max(2, col.columns - 1) : col.columns;
+  const grid = (
+    <div className={gridClass(columns, col.mobileColumns)} style={{ "--st-image-ratio": `var(--st-collection-ratio, var(--st-image-ratio))` } as React.CSSProperties}>
+      {cards.map((product) => (
+        <ProductCard key={product.id} product={product} storeSlug={storeSlug} currency={store.currency} showRating={store.theme.cards.showRating} priceEmphasis={store.theme.cards.priceEmphasis} />
+      ))}
+    </div>
+  );
+
   return (
-    <div className="mx-auto max-w-6xl px-5 py-10">
-      <header className="mb-7">
-        <h1 className="text-[26px] font-semibold tracking-[-0.02em] text-ink-900">Shop</h1>
-        <p className="mt-1 text-[13.5px] text-ink-500">
-          {products.length} product{products.length === 1 ? "" : "s"}
-        </p>
+    <div className="mx-auto px-5 py-10 sm:px-7" style={{ maxWidth: "var(--st-max-width)" }}>
+      <header className={cn("mb-7", col.hero === "none" && "sr-only")}>
+        <h1 className="st-heading-transform st-h-md">Shop</h1>
+        {col.showCount && <p className="st-muted mt-1 text-[13.5px]">{products.length} product{products.length === 1 ? "" : "s"}</p>}
       </header>
 
-      <div className="grid gap-8 lg:grid-cols-[200px_1fr]">
-        <StorefrontFilters
-          categories={categories.map((category) => ({
-            slug: category.slug,
-            name: category.name,
-            count: category._count.products,
-          }))}
-          minPrice={Math.floor(toNumber(priceRange._min.price))}
-          maxPrice={Math.ceil(toNumber(priceRange._max.price))}
-          currency={store.currency}
-        />
-
+      <div className={cn("grid gap-8", col.showFilters && "lg:grid-cols-[200px_1fr]")}>
+        {col.showFilters && (
+          <StorefrontFilters
+            categories={categories.map((category) => ({ slug: category.slug, name: category.name, count: category._count.products }))}
+            minPrice={Math.floor(toNumber(priceRange._min.price))}
+            maxPrice={Math.ceil(toNumber(priceRange._max.price))}
+            currency={store.currency}
+          />
+        )}
         <div>
           {cards.length === 0 ? (
-            <p className="rounded-md border border-dashed border-ink-300 px-4 py-16 text-center text-[14px] text-ink-500">
+            <p className="st-radius st-muted border border-dashed px-4 py-16 text-center text-[14px]" style={{ borderColor: "var(--st-border-strong)" }}>
               No products match these filters.
             </p>
-          ) : (
-            <div className="grid grid-cols-2 gap-x-5 gap-y-9 sm:grid-cols-3">
-              {cards.map((product) => (
-                <ProductCard key={product.id} product={product} storeSlug={storeSlug} currency={store.currency} />
-              ))}
-            </div>
-          )}
+          ) : grid}
         </div>
       </div>
     </div>

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { getStore } from "@/lib/storefront/data";
 import { SectionRenderer } from "@/components/storefront/sections";
+import { PreviewBridge } from "@/components/storefront/preview-bridge";
 import { requireCapability } from "@/lib/session";
 import { normaliseSectionConfig, isSectionType } from "@/lib/storefront/sections";
 
@@ -57,10 +58,11 @@ export default async function PreviewPage({
 
   return (
     <>
+      <PreviewBridge />
       {sections
         .filter((section) => section.visible)
-        .map((section) => (
-          <SectionRenderer key={section.id} store={store} section={{ ...section, visible: true }} preview />
+        .map((section, index) => (
+          <SectionRenderer key={section.id} store={store} section={{ ...section, visible: true }} preview index={index} />
         ))}
       {sections.length === 0 && (
         <div className="px-6 py-24 text-center text-[14px] text-ink-500">

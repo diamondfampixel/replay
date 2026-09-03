@@ -4,22 +4,26 @@ import * as React from "react";
 import { toast } from "sonner";
 import { subscribeAction } from "@/app/actions/storefront";
 import { useStorefrontSession } from "@/components/storefront/analytics";
+import { cn } from "@/lib/utils";
 
 export function NewsletterForm({
   storeSlug,
   buttonLabel = "Subscribe",
+  className,
 }: {
   storeSlug: string;
   buttonLabel?: string;
+  className?: string;
 }) {
   const sessionId = useStorefrontSession();
   const [pending, startTransition] = React.useTransition();
   const [done, setDone] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const id = React.useId();
 
   if (done) {
     return (
-      <p className="rounded-md border border-current/20 px-4 py-3 text-[13.5px]">
+      <p className="st-radius border px-4 py-3 text-[13.5px]" style={{ borderColor: "var(--st-border-strong)" }}>
         Thanks — you&apos;re on the list.
       </p>
     );
@@ -27,7 +31,7 @@ export function NewsletterForm({
 
   return (
     <form
-      className="flex flex-col gap-2 sm:flex-row"
+      className={cn("flex flex-col gap-2 sm:flex-row", className)}
       onSubmit={(event) => {
         event.preventDefault();
         const formData = new FormData(event.currentTarget);
@@ -43,23 +47,12 @@ export function NewsletterForm({
         });
       }}
     >
-      <label className="sr-only" htmlFor="newsletter-email">Email address</label>
-      <input
-        id="newsletter-email"
-        name="email"
-        type="email"
-        required
-        placeholder="you@example.com"
-        className="h-11 flex-1 rounded-md border border-current/25 bg-white/95 px-3 text-[14px] text-ink-900 outline-none placeholder:text-ink-400"
-      />
-      <button
-        type="submit"
-        disabled={pending}
-        className="h-11 rounded-md bg-ink-900 px-5 text-[14px] font-medium text-white transition-colors hover:bg-ink-800 disabled:opacity-60"
-      >
+      <label className="sr-only" htmlFor={id}>Email address</label>
+      <input id={id} name="email" type="email" required placeholder="you@example.com" className="st-input flex-1" />
+      <button type="submit" disabled={pending} className="st-btn disabled:opacity-60">
         {pending ? "Subscribing…" : buttonLabel}
       </button>
-      {error && <p className="text-[12.5px] text-[var(--color-signal-negative)] sm:absolute sm:mt-12">{error}</p>}
+      {error && <p className="text-[12.5px]" style={{ color: "var(--st-sale)" }}>{error}</p>}
     </form>
   );
 }

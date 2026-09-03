@@ -7,6 +7,7 @@ import { catalogTools } from "@/lib/ai/tools/catalog";
 import { marketingTools } from "@/lib/ai/tools/marketing";
 import { storefrontTools } from "@/lib/ai/tools/storefront";
 import { operationsTools } from "@/lib/ai/tools/operations";
+import { designTools } from "@/lib/ai/tools/design";
 import { can, type Capability } from "@/lib/permissions";
 import type { Role } from "@/generated/prisma/client";
 
@@ -15,6 +16,7 @@ export const TOOLS: ToolDefinition[] = [
   ...catalogTools,
   ...marketingTools,
   ...storefrontTools,
+  ...designTools,
   ...operationsTools,
 ];
 

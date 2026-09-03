@@ -198,6 +198,7 @@ model Store {
   updatedAt DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  designSnapshots DesignSnapshot[]
 
   settings       StoreSettings?
   pages          Page[]
@@ -307,6 +308,24 @@ model Page {
 
   @@unique([storeId, slug])
   @@index([storeId])
+}
+
+/// A point-in-time copy of a store's whole design (theme + every page's
+/// sections). Taken automatically before AI redesigns and on demand from the
+/// editor, so any redesign is reversible with one click.
+model DesignSnapshot {
+  id        String   @id @default(cuid())
+  storeId   String
+  label     String
+  source    String   @default("manual") // manual | ai | auto
+  theme     Json?
+  pages     Json     @default("[]")
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, createdAt])
 }
 
 model PageSection {

@@ -185,6 +185,18 @@ export async function getProductCards(
   return withRatings(products.map(toCard));
 }
 
+/** One product with enough detail for a "featured product" section. */
+export async function getFeaturedProduct(storeId: string, productId: string) {
+  if (!productId) return null;
+  const product = await prisma.product.findFirst({
+    where: { storeId, status: "ACTIVE", OR: [{ id: productId }, { slug: productId }] },
+    select: { ...CARD_SELECT, description: true, images: { orderBy: { position: "asc" as const }, take: 3, select: { url: true, alt: true } } },
+  });
+  if (!product) return null;
+  const [card] = await withRatings([toCard({ ...product, images: product.images })]);
+  return { ...card, description: product.description, images: product.images };
+}
+
 export async function getCollectionCards(storeId: string, slugs: string[]) {
   const where = slugs.length
     ? { storeId, visible: true, slug: { in: slugs } }

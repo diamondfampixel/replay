@@ -11,6 +11,7 @@ import {
 import { generateStoreConfig } from "@/lib/ai/store-builder";
 import { isAIConfigured } from "@/lib/ai/config";
 import { audit } from "@/lib/services/context";
+import { resolveTheme } from "@/lib/storefront/theme";
 
 export async function saveDraftAction(pageId: string, sections: unknown) {
   return guard(async () => {
@@ -87,6 +88,8 @@ export async function regenerateHomepageAction(input: {
         targetCustomer: store.targetCustomer ?? "",
         brandPersonality: store.brandPersonality ?? "",
         aesthetic: "editorial",
+        direction: resolveTheme({ theme: store.theme, primaryColor: store.primaryColor }).direction,
+        feel: [],
         primaryColor: store.primaryColor,
         secondaryColor: store.secondaryColor,
         contactEmail: store.contactEmail ?? "",
@@ -97,6 +100,7 @@ export async function regenerateHomepageAction(input: {
       {
         productTitles: products.map((product) => product.title),
         collectionSlugs: collections.map((collection) => collection.slug),
+        theme: resolveTheme({ theme: store.theme, primaryColor: store.primaryColor, secondaryColor: store.secondaryColor }),
       },
     );
 

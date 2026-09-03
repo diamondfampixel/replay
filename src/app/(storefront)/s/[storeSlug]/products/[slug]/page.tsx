@@ -6,6 +6,7 @@ import { getStorefrontSessionId } from "@/lib/storefront/session";
 import { resolveExperiments } from "@/lib/storefront/experiments";
 import { toNumber } from "@/lib/money";
 import { ProductDetail } from "@/components/storefront/product-detail";
+import { formatMoney } from "@/lib/money";
 
 export async function generateMetadata({
   params,
@@ -63,7 +64,7 @@ export default async function ProductPage({
     if (typeof changes.imageUrl === "string") heroImage = changes.imageUrl;
   }
 
-  const [reviews, ratingAggregate, distribution, recommended] = await Promise.all([
+  const [reviews, ratingAggregate, distribution, recommended, settings] = await Promise.all([
     prisma.review.findMany({
       where: { productId: product.id, status: "PUBLISHED" },
       orderBy: { createdAt: "desc" },
@@ -83,7 +84,16 @@ export default async function ProductPage({
       source: product.categoryId ? "newest" : "bestsellers",
       limit: 5,
     }),
+    prisma.storeSettings.findUnique({ where: { storeId: store.id }, select: { freeShippingThreshold: true } }),
   ]);
+
+  // Trust claims are never invented: the theme's own items win, otherwise the
+  // one thing the platform actually enforces (the free-shipping threshold).
+  const trustItems = store.theme.product.trustItems.length
+    ? store.theme.product.trustItems.map((item) => item.text).filter(Boolean)
+    : settings?.freeShippingThreshold
+      ? [`Free shipping on orders over ${formatMoney(toNumber(settings.freeShippingThreshold), store.currency)}`]
+      : [];
 
   const images = heroImage && heroImage !== product.images[0]?.url
     ? [{ id: "variant-hero", url: heroImage, alt: title, position: -1 }, ...product.images]
@@ -130,6 +140,8 @@ export default async function ProductPage({
         createdAt: review.createdAt.toISOString(),
       }))}
       recommended={recommended.filter((item) => item.id !== product.id).slice(0, 4)}
+      design={{ ...store.theme.product, cards: store.theme.cards }}
+      trustItems={trustItems}
     />
   );
 }

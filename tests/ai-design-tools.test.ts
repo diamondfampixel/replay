@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanupTestStore, createTestStore, testDb } from "./helpers";
 import type { ServiceContext } from "@/lib/services/context";
 import { storefrontTools } from "@/lib/ai/tools/storefront";
+import { designTools } from "@/lib/ai/tools/design";
 import { resolveTheme, storeThemeSchema } from "@/lib/storefront/theme";
 
 /**
@@ -90,9 +91,10 @@ describe("AI storefront designer tools", () => {
     const before = await storedTheme(ctx.storeId);
     const result = await setDirection.execute({ direction: "editorial" }, ctx);
     expect((await storedTheme(ctx.storeId)).direction).toBe("editorial");
-    // Replay the returned undo through update_store_design.
-    expect(result.undo?.tool).toBe("update_store_design");
-    await updateDesign.execute(result.undo!.params as never, ctx);
+    // A direction switch snapshots first; its undo restores that snapshot.
+    expect(result.undo?.tool).toBe("restore_design_snapshot");
+    const restore = designTools.find((t) => t.name === "restore_design_snapshot")!;
+    await restore.execute(result.undo!.params as never, ctx);
     expect((await storedTheme(ctx.storeId)).direction).toBe(before.direction);
   });
 });
