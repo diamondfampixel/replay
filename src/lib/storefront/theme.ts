@@ -559,7 +559,7 @@ export function resolveTheme(input: { theme?: unknown; primaryColor: string; sec
     "--st-accent": accent, "--st-accent-fg": accentInk, "--st-secondary": secondary,
     "--st-brand-bg": brand.bg, "--st-brand-fg": brand.fg,
     "--st-contrast-bg": contrastBg, "--st-contrast-fg": contrastFg,
-    "--st-link": link, "--st-sale": sale, "--st-success": success, "--st-warning": warning,
+    "--st-link": link, "--st-sale": sale, "--st-sale-fg": readableInk(sale), "--st-success": success, "--st-warning": warning,
     "--st-radius": RADIUS_PX[radius], "--st-radius-sm": RADIUS_PX[radius === "none" ? "none" : radius === "pill" ? "lg" : "sm"],
     "--st-radius-image": RADIUS_PX[imageRadius], "--st-radius-card": RADIUS_PX[cardRadius],
     "--st-radius-input": inputShape === "pill" ? "9999px" : inputShape === "sharp" ? "0px" : "8px",

@@ -447,6 +447,7 @@ body {
 [data-header="transparent"] .st-header:not(.is-scrolled) { background: transparent !important; border-color: transparent !important; backdrop-filter: none; }
 [data-header="transparent"] .st-header.is-scrolled { position: fixed; inset-inline: 0; top: 0; }
 [data-header="transparent"] .st-main > .st-section:first-child { padding-top: calc(var(--st-header-h, 4rem) + 1rem); }
+[data-header="transparent"] .st-main > :not(.st-section):first-child { padding-top: var(--st-header-h, 4rem); }
 [data-header="transparent"] .st-main > .st-section:first-child[data-scheme="contrast"] { padding-top: var(--st-header-h, 4rem); }
 [data-header="transparent"] .st-header:not(.is-scrolled).on-dark { color: #fff; --st-fg: #fff; --st-muted-fg: rgba(255,255,255,.8); }
 

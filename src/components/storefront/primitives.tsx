@@ -96,7 +96,7 @@ export function ProductCard({
           </span>
         )}
         {product.compareAtPrice != null && product.compareAtPrice > product.price && product.inStock && (
-          <span className="st-badge absolute left-2 top-2 text-white" style={{ background: "var(--st-sale)" }}>
+          <span className="st-badge absolute left-2 top-2" style={{ background: "var(--st-sale)", color: "var(--st-sale-fg)" }}>
             Sale
           </span>
         )}
