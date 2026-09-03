@@ -29,7 +29,8 @@ export type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   toolCalls?: ChatToolCall[];
-  pending?: PendingConfirmation | null;
+  /** Every action in this turn that is waiting for (or has had) a decision. */
+  pendingActions?: PendingConfirmation[];
 };
 
 export type PendingConfirmation = {
@@ -172,7 +173,7 @@ export function AssistantChat({
                 ),
               }));
             } else if (event === "confirmation_required") {
-              patch((message) => ({ ...message, pending: data as PendingConfirmation }));
+              patch((message) => ({ ...message, pendingActions: [...(message.pendingActions ?? []), data as PendingConfirmation] }));
             } else if (event === "error") {
               patch((message) => ({
                 ...message,
@@ -216,11 +217,11 @@ export function AssistantChat({
 
     setMessages((prev) =>
       prev.map((message) => {
-        if (message.id !== messageId || !message.pending) return message;
+        if (message.id !== messageId || !message.pendingActions?.length) return message;
         const resolved = decision === "confirm" ? "confirmed" : "cancelled";
         return {
           ...message,
-          pending: { ...message.pending, resolved },
+          pendingActions: message.pendingActions.map((p) => (p.actionId === actionId ? { ...p, resolved } : p)),
           toolCalls: (message.toolCalls ?? []).map((call) =>
             call.actionId === actionId
               ? {
@@ -396,7 +397,7 @@ function MessageBubble({
   message, onConfirm, onUndo,
 }: {
   message: ChatMessage;
-  onConfirm: (actionId: string, decision: "confirm" | "cancel") => void;
+  onConfirm: (actionId: string, decision: "confirm" | "cancel") => void | Promise<void>;
   onUndo: (actionId: string) => void;
 }) {
   if (message.role === "user") {
@@ -421,8 +422,8 @@ function MessageBubble({
         </div>
       )}
 
-      {message.pending && (
-        <ConfirmationCard pending={message.pending} onDecision={onConfirm} />
+      {message.pendingActions && message.pendingActions.length > 0 && (
+        <ConfirmationList pending={message.pendingActions} onDecision={onConfirm} />
       )}
     </div>
   );
@@ -481,11 +482,35 @@ function ToolCallRow({ call, onUndo }: { call: ChatToolCall; onUndo: (actionId: 
   );
 }
 
+/**
+ * One card per action waiting on the operator, plus "Approve all" when a
+ * redesign queued several. Approving runs them in the order the assistant
+ * proposed them; each still resolves individually.
+ */
+function ConfirmationList({ pending, onDecision }: { pending: PendingConfirmation[]; onDecision: (actionId: string, decision: "confirm" | "cancel") => void | Promise<void> }) {
+  const [busy, setBusy] = React.useState(false);
+  const open = pending.filter((p) => !p.resolved);
+  return (
+    <div className="space-y-2">
+      {open.length > 1 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-ink-200 bg-ink-50 px-3.5 py-2.5 text-[13px] text-ink-700">
+          <span>{open.length} changes are waiting for your approval. Review each below, or approve them together.</span>
+          <div className="flex gap-2">
+            <Button size="sm" variant="secondary" disabled={busy} onClick={() => { setBusy(true); for (const p of open) onDecision(p.actionId, "cancel"); }}>Cancel all</Button>
+            <Button size="sm" variant="primary" loading={busy} onClick={async () => { setBusy(true); for (const p of open) { await onDecision(p.actionId, "confirm"); } }}>Approve all {open.length}</Button>
+          </div>
+        </div>
+      )}
+      {pending.map((p) => <ConfirmationCard key={p.actionId} pending={p} onDecision={onDecision} />)}
+    </div>
+  );
+}
+
 function ConfirmationCard({
   pending, onDecision,
 }: {
   pending: PendingConfirmation;
-  onDecision: (actionId: string, decision: "confirm" | "cancel") => void;
+  onDecision: (actionId: string, decision: "confirm" | "cancel") => void | Promise<void>;
 }) {
   const [busy, setBusy] = React.useState(false);
 

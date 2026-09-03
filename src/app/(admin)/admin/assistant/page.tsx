@@ -38,15 +38,32 @@ export default async function AssistantPage({
     ? await loadMessages(conversationId).catch(() => [])
     : [];
 
-  const initialMessages: ChatMessage[] = stored.map((message) => ({
-    id: message.id,
-    role: message.role as "user" | "assistant",
-    content: message.content,
-    toolCalls: (message.toolCalls ?? []) as ChatToolCall[],
-    pending: message.pendingAction
-      ? ({ ...(message.pendingAction as object), resolved: "confirmed" } as PendingConfirmation)
-      : null,
-  }));
+  // Pending confirmations are restored from the action rows' real status, so a
+  // reload still shows what is waiting for approval and what was handled.
+  const pendingRaw = stored.flatMap((message) => {
+    const raw = message.pendingAction;
+    return Array.isArray(raw) ? (raw as PendingConfirmation[]) : raw ? [raw as PendingConfirmation] : [];
+  });
+  const actionRows = pendingRaw.length
+    ? await prisma.aIAction.findMany({ where: { id: { in: pendingRaw.map((a) => a.actionId) }, storeId: ctx.storeId }, select: { id: true, status: true } })
+    : [];
+  const statusOf = new Map(actionRows.map((a) => [a.id, a.status]));
+  const resolvedFor = (actionId: string): PendingConfirmation["resolved"] => {
+    const status = statusOf.get(actionId);
+    if (!status || status === "PENDING_CONFIRMATION") return undefined;
+    return status === "CANCELLED" ? "cancelled" : "confirmed";
+  };
+  const initialMessages: ChatMessage[] = stored.map((message) => {
+    const raw = message.pendingAction;
+    const list = Array.isArray(raw) ? (raw as PendingConfirmation[]) : raw ? [raw as PendingConfirmation] : [];
+    return {
+      id: message.id,
+      role: message.role as "user" | "assistant",
+      content: message.content,
+      toolCalls: (message.toolCalls ?? []) as ChatToolCall[],
+      pendingActions: list.map((a) => ({ ...a, resolved: resolvedFor(a.actionId) })),
+    };
+  });
 
   return (
     <div className="mx-auto grid max-w-[1200px] gap-4 lg:grid-cols-[220px_1fr]">

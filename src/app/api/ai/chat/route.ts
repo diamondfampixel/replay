@@ -138,8 +138,13 @@ export async function POST(request: Request) {
       continue;
     }
     const calls = (message.toolCalls ?? []) as StoredToolCall[];
+    const describe = (call: StoredToolCall) =>
+      call.status === "executed" ? `${call.name} — done: ${call.summary ?? "executed"}`
+      : call.status === "cancelled" ? `${call.name} — the operator declined this; do not propose it again unless asked`
+      : call.status === "pending" ? `${call.name} — still waiting for the operator's approval on screen; do not call it again`
+      : `${call.name} — failed: ${call.error ?? "error"}`;
     const summary = calls.length
-      ? `${message.content}\n\n[Actions taken: ${calls.map((call) => `${call.name} — ${call.summary ?? call.error ?? call.status}`).join("; ")}]`
+      ? `${message.content}\n\n[Actions from this turn: ${calls.map(describe).join("; ")}]`
       : message.content;
     if (summary.trim()) messages.push({ role: "assistant", content: summary });
   }
@@ -152,7 +157,9 @@ export async function POST(request: Request) {
       }
 
       const toolCalls: StoredToolCall[] = [];
-      let pendingAction: PendingAction | null = null;
+      // Every tool that needs approval gets its own confirmation; a redesign
+      // that queues six changes must not silently drop five of them.
+      const pendingActions: PendingAction[] = [];
       let finalText = "";
 
       try {
@@ -220,7 +227,7 @@ export async function POST(request: Request) {
                 content: JSON.stringify({ summary: outcome.result.summary, data: outcome.result.data }).slice(0, 24000),
               });
             } else if (outcome.status === "needs_confirmation") {
-              pendingAction = {
+              const pendingAction: PendingAction = {
                 actionId: outcome.actionId,
                 toolName: toolUse.name,
                 title: outcome.confirmation.title,
@@ -237,6 +244,7 @@ export async function POST(request: Request) {
                 actionId: outcome.actionId,
                 risk: outcome.risk,
               });
+              pendingActions.push(pendingAction);
               send("confirmation_required", pendingAction);
               results.push({
                 type: "tool_result",
@@ -271,7 +279,7 @@ export async function POST(request: Request) {
 
           // Once something is waiting on a human, let the model close its turn
           // and stop rather than pushing further changes.
-          if (pendingAction) {
+          if (pendingActions.length) {
             const closing = await callModel(messages, 512);
             const closingText = closing.content
               .filter((block): block is Anthropic.TextBlock => block.type === "text")
@@ -286,7 +294,7 @@ export async function POST(request: Request) {
           }
         }
 
-        await appendMessage(conversation.id, "assistant", finalText, { toolCalls, pendingAction });
+        await appendMessage(conversation.id, "assistant", finalText, { toolCalls, pendingAction: pendingActions });
         await touchConversation(conversation.id);
         send("done", { conversationId: conversation.id });
       } catch (error) {

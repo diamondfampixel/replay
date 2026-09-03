@@ -3,6 +3,7 @@ import { z } from "zod";
 import { apiContext, clientErrorMessage } from "@/lib/services/context";
 import { reportError } from "@/lib/monitoring";
 import { cancelPendingAction, confirmPendingAction, undoAction } from "@/lib/ai/executor";
+import { markToolCallOutcome } from "@/lib/ai/conversation";
 
 export const runtime = "nodejs";
 
@@ -21,15 +22,20 @@ export async function POST(request: Request) {
   try {
     if (parsed.data.decision === "cancel") {
       await cancelPendingAction(parsed.data.actionId, ctx);
+      await markToolCallOutcome(parsed.data.actionId, { status: "cancelled", error: "Declined by the operator" }).catch(() => undefined);
       return NextResponse.json({ status: "cancelled" });
     }
 
     if (parsed.data.decision === "undo") {
       const result = await undoAction(parsed.data.actionId, ctx);
+      await markToolCallOutcome(parsed.data.actionId, { status: "executed", summary: `Undone by the operator: ${result.summary}` }).catch(() => undefined);
       return NextResponse.json({ status: "undone", summary: result.summary });
     }
 
     const outcome = await confirmPendingAction(parsed.data.actionId, ctx);
+    await markToolCallOutcome(parsed.data.actionId, outcome.status === "executed"
+      ? { status: "executed", summary: outcome.result.summary }
+      : { status: "failed", error: outcome.status === "failed" ? outcome.error : "Could not complete." }).catch(() => undefined);
     if (outcome.status === "executed") {
       return NextResponse.json({
         status: "executed",
