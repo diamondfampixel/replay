@@ -28,7 +28,7 @@ const rows: Array<{ label: string; value: (p: (typeof PLANS)[number]) => string 
 const faq = [
   {
     q: "What counts as an AI action?",
-    a: "One task you give the assistant — a question answered, a product created, a price change proposed. Reading your own dashboards never costs actions. Harbor includes 50 actions to build with; paid plans refill monthly.",
+    a: `One message you send the assistant — a question answered, a product created, a redesign proposed — counts as one action, however many steps it takes internally. Reading your own dashboards never costs actions. Harbor includes ${PLANS[0].limits.aiStarterActions} actions to build with; paid plans refill monthly.`,
   },
   {
     q: "Do you take a cut of my sales?",
@@ -36,7 +36,7 @@ const faq = [
   },
   {
     q: "What happens if I hit my AI limit?",
-    a: "The assistant pauses until your monthly allowance resets or you upgrade — Harbor's 50 starter actions are one-time. Nothing else stops working; your store and analytics run as normal.",
+    a: `The assistant pauses until your monthly allowance resets or you upgrade — Harbor's ${PLANS[0].limits.aiStarterActions} starter actions are one-time. Nothing else stops working; your store, orders and analytics run as normal, and you are never charged extra automatically.`,
   },
   {
     q: "Can I change plans later?",

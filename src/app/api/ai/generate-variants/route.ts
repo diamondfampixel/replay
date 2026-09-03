@@ -3,7 +3,8 @@ import { z } from "zod";
 import type Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/db";
 import { apiContext, ValidationError } from "@/lib/services/context";
-import { assertAIWithinBudget, recordAIUsage } from "@/lib/services/billing";
+import { assertAIWithinBudget, recordAIRequest } from "@/lib/services/billing";
+import { supportsEffort } from "@/lib/ai/routing";
 import { getAIConfig } from "@/lib/ai/config";
 import { createAnthropic, extractJson } from "@/lib/ai/client";
 import { buildStoreContext } from "@/lib/ai/context";
@@ -24,6 +25,7 @@ const bodySchema = z.object({
 
 /** Generates alternative copy for an A/B test. Writes nothing. */
 export async function POST(request: Request) {
+  const startedAt = Date.now();
   const ctx = await apiContext();
   if (!ctx) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   if (!can(ctx.role, "experiments:write")) {
@@ -86,6 +88,9 @@ export async function POST(request: Request) {
     const response = await anthropic.messages.create({
       model: config.model,
       max_tokens: 1500,
+      // Short structured copy: low effort keeps the quality and drops the
+      // thinking tokens a harder setting would spend on a simple task.
+      ...(supportsEffort(config.model) ? { output_config: { effort: "low" as const } } : {}),
       system: `You write ecommerce copy for A/B tests.\n\n## The store\n\n${storeContext}`,
       messages: [{ role: "user", content: prompt }],
     });
@@ -97,13 +102,24 @@ export async function POST(request: Request) {
 
     const variants = z.array(z.string().min(1).max(2000)).parse(extractJson(text));
 
-    await recordAIUsage(ctx.organizationId, {
+    await recordAIRequest(ctx.organizationId, {
+      storeId: ctx.storeId,
+      userId: ctx.userId,
+      kind: "variants",
+      tier: "standard",
+      model: config.model,
+      modelCalls: 1,
+      toolCalls: 0,
+      usage: {
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+        cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+      },
+      status: "ok",
+      durationMs: Date.now() - startedAt,
       actions: 1,
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens,
-      cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
-      cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
-    }).catch(() => undefined);
+    });
 
     return NextResponse.json({ variants: variants.slice(0, input.count) });
   } catch (error) {

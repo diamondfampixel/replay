@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { ExternalLink, PanelLeftClose, PanelLeft, Search } from "lucide-react";
 import { Wordmark, Logomark } from "@/components/brand";
 import { NavIcon } from "@/components/admin/icon";
-import { ADMIN_NAV } from "@/lib/nav";
+import { ADMIN_NAV, PLATFORM_NAV, type NavGroup } from "@/lib/nav";
 import { can, type Capability } from "@/lib/permissions";
 import type { Role } from "@/generated/prisma/client";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,7 @@ import { useIsMac } from "@/lib/client-state";
 
 export function Sidebar({
   role,
+  platformAdmin = false,
   storeSlug,
   storeName,
   collapsed,
@@ -21,6 +22,7 @@ export function Sidebar({
   onNavigate,
 }: {
   role: Role;
+  platformAdmin?: boolean;
   storeSlug: string;
   storeName: string;
   collapsed: boolean;
@@ -88,7 +90,7 @@ export function Sidebar({
       </div>
 
       <nav className="scroll-thin flex-1 overflow-y-auto px-3 py-3" aria-label="Main">
-        {ADMIN_NAV.map((group, groupIndex) => {
+        {[...ADMIN_NAV, ...(platformAdmin ? PLATFORM_NAV : [])].map((group: NavGroup, groupIndex: number) => {
           const items = group.items.filter(
             (item) => !item.capability || can(role, item.capability as Capability),
           );

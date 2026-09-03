@@ -426,12 +426,12 @@ unverified.
 
 | Area | Status |
 | --- | --- |
-| Stripe charges and webhooks | Credentials validate; checkout refuses Stripe mode rather than faking a payment |
+| Shopper checkout through Stripe | Merchant storefront checkout refuses Stripe mode rather than faking a payment; it runs in test/simulated mode. Halyard's own subscription and theme-purchase billing (`src/app/api/billing/*`) is implemented and webhook-driven, and activates when live Stripe keys are configured |
 | Tax calculation | One flat rate. No nexus, destination rates, product taxability or exemptions. Not suitable for filing — the UI says so |
 | Shipping rates | Flat rate with a free-shipping threshold. No zones or carrier rates |
 | Custom domains | No DNS verification or certificate issuance; no fake form |
 | Email invitations | Team members must already have an account |
-| Billing | Plans are placeholders; nothing is charged |
+| Billing without Stripe keys | Plan changes apply locally and nothing is charged; the UI says so. With keys, paid plans check out through Stripe |
 | Most connectors | Marked "planned"; connecting is refused |
 
 ---

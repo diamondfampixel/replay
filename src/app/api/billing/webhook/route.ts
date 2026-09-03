@@ -114,6 +114,21 @@ export async function POST(request: Request) {
         break;
       }
 
+      case "charge.refunded": {
+        // A refunded theme purchase loses its entitlement; the row stays for
+        // the books. Subscription refunds change nothing here — the
+        // subscription events above own plan state.
+        const charge = event.data.object;
+        const paymentIntent = typeof charge.payment_intent === "string" ? charge.payment_intent : null;
+        if (paymentIntent && charge.refunded) {
+          await prisma.themePurchase.updateMany({
+            where: { stripePaymentIntentId: paymentIntent, status: "PAID" },
+            data: { status: "REFUNDED" },
+          });
+        }
+        break;
+      }
+
       default:
         break;
     }

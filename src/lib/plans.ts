@@ -36,6 +36,14 @@ export type Plan = {
      * API cost; the allowance ending is the natural "make it real" moment.
      */
     aiStarterActions: number | null;
+    /**
+     * Internal hard safety ceiling on estimated Anthropic spend, in US cents —
+     * per calendar month on paid plans, over the account's life on Harbor.
+     * It sits well above what the action allowance normally costs, so a
+     * customer only meets it when actions are running abnormally expensive.
+     * Never shown to customers; the limit they see is the action count.
+     */
+    aiSpendCeilingCents: number;
     emailCampaigns: boolean;
     liveCheckout: boolean;
     /** Connecting a custom domain — an operating concern, so paid. */
@@ -61,7 +69,7 @@ export const PLANS: Plan[] = [
     features: [
       "Full admin, storefront and page editor",
       "Up to 50 products",
-      "50 AI actions to build with",
+      "25 AI actions to build with",
       "1 A/B test running",
       "Checkout in test mode",
       "Built on Halyard storefront credit",
@@ -72,7 +80,8 @@ export const PLANS: Plan[] = [
       teamMembers: 1,
       runningExperiments: 1,
       aiActionsPerMonth: null,
-      aiStarterActions: 50,
+      aiStarterActions: 25,
+      aiSpendCeilingCents: 250,
       emailCampaigns: false,
       liveCheckout: false,
       customDomain: false,
@@ -93,7 +102,7 @@ export const PLANS: Plan[] = [
       "Live checkout, 0% platform fees",
       "Custom domain, no Halyard branding",
       "Unlimited products",
-      "300 AI actions a month",
+      "100 AI actions a month",
       "2 A/B tests running",
       "2 team members",
     ],
@@ -102,8 +111,9 @@ export const PLANS: Plan[] = [
       products: null,
       teamMembers: 2,
       runningExperiments: 2,
-      aiActionsPerMonth: 300,
+      aiActionsPerMonth: 100,
       aiStarterActions: null,
+      aiSpendCeilingCents: 1000,
       emailCampaigns: false,
       liveCheckout: true,
       customDomain: true,
@@ -122,7 +132,7 @@ export const PLANS: Plan[] = [
     introFirstMonth: 1,
     features: [
       "Everything in Skiff",
-      "1,500 AI actions a month",
+      "250 AI actions a month",
       "Unlimited A/B tests",
       "Email campaigns and subscribers",
       "5 team members",
@@ -132,8 +142,9 @@ export const PLANS: Plan[] = [
       products: null,
       teamMembers: 5,
       runningExperiments: null,
-      aiActionsPerMonth: 1500,
+      aiActionsPerMonth: 250,
       aiStarterActions: null,
+      aiSpendCeilingCents: 2500,
       emailCampaigns: true,
       liveCheckout: true,
       customDomain: true,
@@ -153,7 +164,7 @@ export const PLANS: Plan[] = [
     introFirstMonth: 1,
     features: [
       "Everything in Clipper",
-      "6,000 AI actions a month",
+      "600 AI actions a month",
       "Up to 3 stores",
       "Unlimited team members",
       "Analytics export",
@@ -163,8 +174,9 @@ export const PLANS: Plan[] = [
       products: null,
       teamMembers: null,
       runningExperiments: null,
-      aiActionsPerMonth: 6000,
+      aiActionsPerMonth: 600,
       aiStarterActions: null,
+      aiSpendCeilingCents: 6000,
       emailCampaigns: true,
       liveCheckout: true,
       customDomain: true,

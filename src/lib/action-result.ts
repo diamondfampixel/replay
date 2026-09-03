@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { reportError } from "@/lib/monitoring";
 
 export type ActionResult<T = void> =
   | { ok: true; data: T; message?: string }
@@ -42,8 +43,23 @@ export async function guard<T>(fn: () => Promise<ActionResult<T>>): Promise<Acti
     ) {
       throw error;
     }
-    console.error("[action]", error);
-    const message = error instanceof Error ? error.message : "Unexpected error";
-    return fail(message);
+    // The app's convention: an Error thrown with a sentence is written for the
+    // person using it ("This store is not available.") and is shown as-is.
+    // Driver, runtime and upstream failures are not — those are reported and
+    // replaced with a fixed message so internal text never reaches the browser.
+    if (error instanceof Error && !isInternalError(error)) {
+      const fieldErrors = (error as { fieldErrors?: Record<string, string> }).fieldErrors;
+      return fail(error.message, fieldErrors);
+    }
+    reportError("action", error);
+    return fail("Something went wrong on our side. Please try again.");
   }
+}
+
+const INTERNAL_ERROR_NAMES = /^(PrismaClient|TypeError|SyntaxError|RangeError|ReferenceError|AbortError|TimeoutError|APIError|APIConnection)/;
+const INTERNAL_ERROR_TEXT = /prisma|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|EAI_AGAIN|relation "|column "|syntax error|Invalid `|Unique constraint|Foreign key constraint|is not a function|Cannot read properties|is not defined|fetch failed/i;
+
+/** Errors nobody wrote for the operator: database, runtime, network, upstream. */
+function isInternalError(error: Error): boolean {
+  return INTERNAL_ERROR_NAMES.test(error.name) || INTERNAL_ERROR_TEXT.test(error.message);
 }

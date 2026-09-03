@@ -34,19 +34,20 @@ Either click the button in the README, or by hand:
 
 5. Deploy.
 
-## 3. Migrate and seed
+## 3. Migrate — and do not seed production
 
 From your machine, with the production `DATABASE_URL`:
 
 ```bash
 DATABASE_URL="<neon url>" npx prisma migrate deploy
-DATABASE_URL="<neon url>" npm run db:seed
 ```
 
-The seed is deterministic and idempotent — it rebuilds the demo organization
-in about 20 seconds. Sign in with `demo@halyard.app` / `demo1234` and change
-that password immediately on a public deployment (Settings → Profile signs
-out every other session when you do).
+**Do not run `npm run db:seed` against a production database.** The seed
+creates the demo organization with the published development credentials
+(`demo@halyard.app` / `demo1234`) — fine on a laptop, a publicly known login
+on a live site. Create your own account through the app instead (with an
+invite code while `LAUNCH_STAGE=waitlist`). If you want a populated store to
+show people, seed a separate staging database.
 
 ## Serverless caveats
 

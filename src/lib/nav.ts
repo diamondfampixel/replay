@@ -49,6 +49,14 @@ export const SETTINGS_NAV: NavGroup[] = [
   },
 ];
 
+/** Shown only to platform operators (HALYARD_PLATFORM_ADMINS); the page itself 404s for anyone else. */
+export const PLATFORM_NAV: NavGroup[] = [
+  {
+    label: "Halyard",
+    items: [{ label: "Economics", href: "/admin/platform/economics", icon: "BarChart3" }],
+  },
+];
+
 export const ADMIN_NAV: NavGroup[] = [
   {
     items: [

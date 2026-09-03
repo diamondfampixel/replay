@@ -18,11 +18,12 @@ let productId: string;
 const responses: Array<{ content: unknown[] }> = [];
 type MockRequest = { messages: Array<{ role: string; content: unknown }> };
 const mockUsage = { input_tokens: 900, output_tokens: 120, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
-const createSpy = vi.fn(async (request: MockRequest) => {
+const defaultImplementation = async (request: MockRequest) => {
   void request;
   const next = responses.shift() ?? { content: [{ type: "text", text: "" }] };
   return { usage: mockUsage, ...next };
-});
+};
+const createSpy = vi.fn(defaultImplementation);
 
 vi.mock("@/lib/ai/client", async () => {
   const actual = await vi.importActual<typeof import("@/lib/ai/client")>("@/lib/ai/client");
@@ -33,8 +34,8 @@ vi.mock("@/lib/ai/client", async () => {
 });
 
 vi.mock("@/lib/ai/config", () => ({
-  DEFAULT_MODEL: "test-model",
-  getAIConfig: async () => ({ apiKey: "test", model: "test-model", source: "environment" as const }),
+  DEFAULT_MODEL: "claude-sonnet-5",
+  getAIConfig: async () => ({ apiKey: "test", model: "claude-sonnet-5", source: "environment" as const }),
   isAIConfigured: async () => true,
 }));
 
@@ -86,7 +87,10 @@ afterAll(async () => {
 
 beforeEach(() => {
   responses.length = 0;
-  createSpy.mockClear();
+  // Reset implementations too: a test that installs a permanent mock (the
+  // round-limit test) must not leak into the ones after it.
+  createSpy.mockReset();
+  createSpy.mockImplementation(defaultImplementation);
 });
 
 describe("chat loop", () => {
@@ -233,5 +237,142 @@ describe("chat loop", () => {
 
     await readStream(await post("Keep going"));
     expect(createSpy.mock.calls.length).toBeLessThanOrEqual(8);
+  });
+});
+
+describe("model routing", () => {
+  it("serves a read-only question with the light model and no effort setting", async () => {
+    responses.push({ content: [{ type: "text", text: "Here is the breakdown." }] });
+    await readStream(await post("Give me a breakdown of my recent sales."));
+    const request = createSpy.mock.calls[0][0] as unknown as { model: string; output_config?: unknown };
+    expect(request.model).toBe("claude-haiku-4-5");
+    expect(request.output_config).toBeUndefined();
+  });
+
+  it("serves a store change with the default model at medium effort", async () => {
+    responses.push({ content: [{ type: "text", text: "Done." }] });
+    await readStream(await post("Create a 10% discount code WELCOME10"));
+    const request = createSpy.mock.calls[0][0] as unknown as { model: string; output_config?: { effort: string } };
+    expect(request.model).toBe("claude-sonnet-5");
+    expect(request.output_config).toEqual({ effort: "medium" });
+  });
+
+  it("escalates to the default model once the light model reaches for a write tool", async () => {
+    responses.push({
+      content: [{ type: "tool_use", id: "tu_esc", name: "adjust_prices", input: { scope: "all", changeType: "percent", value: -5 } }],
+    });
+    responses.push({ content: [{ type: "text", text: "Awaiting approval." }] });
+    await readStream(await post("What about five percent off everything?"));
+    const first = createSpy.mock.calls[0][0] as unknown as { model: string };
+    const second = createSpy.mock.calls[1][0] as unknown as { model: string };
+    expect(first.model).toBe("claude-haiku-4-5");
+    expect(second.model).toBe("claude-sonnet-5");
+  });
+
+  it("falls back to the default model when the light model is unavailable to the key", async () => {
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
+    createSpy.mockImplementationOnce(async () => {
+      throw new Anthropic.NotFoundError(404, { error: { message: "model not found" } }, "not found", new Headers());
+    });
+    responses.push({ content: [{ type: "text", text: "Fallback answered." }] });
+    const events = await readStream(await post("How many orders this week?"));
+    expect(events.find((event) => event.event === "text")?.data.text).toBe("Fallback answered.");
+    expect((createSpy.mock.calls[1][0] as unknown as { model: string }).model).toBe("claude-sonnet-5");
+  });
+});
+
+describe("spend safeguards and the ledger", () => {
+  it("charges one visible action per message however many model calls it took, and records the request", async () => {
+    const before = await testDb.aIUsageDay.aggregate({ where: { organizationId }, _sum: { actions: true } });
+    responses.push({
+      content: [
+        { type: "tool_use", id: "tu_a", name: "get_store_overview", input: {} },
+        { type: "tool_use", id: "tu_b", name: "get_top_products", input: { limit: 3 } },
+      ],
+    });
+    responses.push({ content: [{ type: "tool_use", id: "tu_c", name: "get_inventory_status", input: {} }] });
+    responses.push({ content: [{ type: "text", text: "Three tools, one answer." }] });
+
+    await readStream(await post("Best sellers and anything low on stock?"));
+    expect(createSpy).toHaveBeenCalledTimes(3);
+
+    const after = await testDb.aIUsageDay.aggregate({ where: { organizationId }, _sum: { actions: true } });
+    expect((after._sum.actions ?? 0) - (before._sum.actions ?? 0)).toBe(1);
+
+    const ledger = await testDb.aIRequest.findFirst({ where: { organizationId }, orderBy: { createdAt: "desc" } });
+    expect(ledger?.kind).toBe("chat_read");
+    expect(ledger?.tier).toBe("light");
+    expect(ledger?.modelCalls).toBe(3);
+    expect(ledger?.toolCalls).toBe(3);
+    expect(ledger?.status).toBe("ok");
+    expect(ledger?.outputTokens).toBe(360);
+    expect(ledger?.estimatedCostMicros).toBeGreaterThan(0);
+    expect(ledger?.plan).toBe("flagship");
+  });
+
+  it("stops a model that keeps repeating the identical tool call", async () => {
+    for (let i = 0; i < 6; i++) {
+      responses.push({ content: [{ type: "tool_use", id: `tu_rep_${i}`, name: "list_products", input: { limit: 2 } }] });
+    }
+    const events = await readStream(await post("List two products, again and again"));
+    const error = events.find((event) => event.event === "error");
+    expect(error?.data.error).toMatch(/repeating/i);
+    // Two identical calls run; the third, fourth and fifth are refused; then it stops.
+    expect(events.filter((event) => event.event === "tool_start")).toHaveLength(2);
+    expect(createSpy.mock.calls.length).toBe(5);
+
+    const ledger = await testDb.aIRequest.findFirst({ where: { organizationId }, orderBy: { createdAt: "desc" } });
+    expect(ledger?.status).toBe("guard");
+    expect(ledger?.guard).toBe("tool_loop");
+  });
+
+  it("stops a request whose estimated spend passes the per-request ceiling", async () => {
+    process.env.AI_REQUEST_SPEND_CEILING_USD = "0.000001";
+    try {
+      responses.push({ content: [{ type: "tool_use", id: "tu_big", name: "list_products", input: {} }] });
+      responses.push({ content: [{ type: "text", text: "never reached" }] });
+      const events = await readStream(await post("What products do I have?"));
+      expect(events.find((event) => event.event === "error")?.data.error).toMatch(/larger than the assistant allows/i);
+      expect(createSpy).toHaveBeenCalledTimes(1);
+      const ledger = await testDb.aIRequest.findFirst({ where: { organizationId }, orderBy: { createdAt: "desc" } });
+      expect(ledger?.guard).toBe("request_spend");
+    } finally {
+      delete process.env.AI_REQUEST_SPEND_CEILING_USD;
+    }
+  });
+
+  it("refuses before any model call once the allowance is spent, and the plan's own limits decide", async () => {
+    await testDb.organization.update({ where: { id: organizationId }, data: { plan: "harbor" } });
+    await testDb.aIUsageDay.deleteMany({ where: { organizationId } });
+    await testDb.aIUsageDay.create({
+      data: { organizationId, day: new Date(Date.UTC(2026, 0, 3)), actions: 25 },
+    });
+    try {
+      const response = await post("Anything?");
+      expect(response.status).toBe(429);
+      const body = await response.json();
+      expect(body.code).toBe("AI_BUDGET");
+      expect(body.error).toMatch(/25/);
+      expect(createSpy).not.toHaveBeenCalled();
+    } finally {
+      await testDb.aIUsageDay.deleteMany({ where: { organizationId } });
+      await testDb.organization.update({ where: { id: organizationId }, data: { plan: "flagship" } });
+    }
+  });
+
+  it("pauses at the internal spend ceiling even with actions left, without naming a price", async () => {
+    await testDb.aIUsageDay.create({
+      data: { organizationId, day: new Date(Date.UTC(2026, 8, 1)), actions: 3, estimatedCostMicros: 60_000_000 },
+    });
+    try {
+      const response = await post("Anything?");
+      expect(response.status).toBe(429);
+      const body = await response.json();
+      expect(body.error).toMatch(/usage limit/i);
+      expect(body.error).not.toMatch(/\$/);
+      expect(createSpy).not.toHaveBeenCalled();
+    } finally {
+      await testDb.aIUsageDay.deleteMany({ where: { organizationId } });
+    }
   });
 });

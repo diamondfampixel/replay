@@ -44,3 +44,20 @@ export function reportError(
     }),
   }).catch(() => undefined);
 }
+
+/**
+ * Non-error signal worth a human's attention — a spend ceiling approached, an
+ * unusually expensive request. Same channel as errors so one webhook covers
+ * both; distinguished by level so a collector can route them differently.
+ */
+export function reportAlert(scope: string, message: string, extra?: Record<string, unknown>): void {
+  console.warn(JSON.stringify({ level: "alert", scope, message, ...(extra ? { extra } : {}), at: new Date().toISOString() }));
+  const webhook = process.env.MONITORING_WEBHOOK_URL?.trim();
+  if (!webhook) return;
+  void fetch(webhook, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ text: `Halyard alert (${scope}): ${message}`, level: "alert", scope, message, extra }),
+    signal: AbortSignal.timeout(3000),
+  }).catch(() => undefined);
+}

@@ -105,6 +105,7 @@ model Organization {
   stores      Store[]
   auditLogs   AuditLog[]
   aiUsage     AIUsageDay[]
+  aiRequests  AIRequest[]
   themePurchases ThemePurchase[]
 }
 
@@ -132,10 +133,49 @@ model AIUsageDay {
   outputTokens     Int      @default(0)
   cacheReadTokens  Int      @default(0)
   cacheWriteTokens Int      @default(0)
+  // Estimated Anthropic spend in micro-dollars (see src/lib/ai/pricing.ts).
+  // Denormalised here so the monthly spend ceiling is one aggregate away.
+  estimatedCostMicros Int   @default(0)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, day])
+}
+
+/// One row per real AI request (a chat turn, a copy-variant generation, an
+/// onboarding build): the economics ledger. Safe metadata only — no prompt
+/// text, no tool inputs, no secrets — so it can be aggregated across
+/// organizations without mixing anyone's private data.
+model AIRequest {
+  id             String  @id @default(cuid())
+  organizationId String
+  storeId        String?
+  userId         String?
+  /// Plan id at the time of the request (harbor | skiff | clipper | flagship).
+  plan           String
+  /// What kind of work it was: chat_read | chat_write | chat_design | chat | variants | onboarding
+  kind           String
+  /// Routing tier that served it: light | standard | design
+  tier           String
+  model          String
+  modelCalls     Int     @default(0)
+  toolCalls      Int     @default(0)
+  inputTokens    Int     @default(0)
+  outputTokens   Int     @default(0)
+  cacheReadTokens  Int   @default(0)
+  cacheWriteTokens Int   @default(0)
+  estimatedCostMicros Int @default(0)
+  /// ok | error | guard (a safeguard stopped it) | budget (refused before any model call)
+  status     String
+  /// Which safeguard fired, when status is guard.
+  guard      String?
+  durationMs Int     @default(0)
+  createdAt  DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([createdAt])
 }
 
 model Membership {

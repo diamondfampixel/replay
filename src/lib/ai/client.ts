@@ -2,8 +2,15 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import type { AIConfig } from "@/lib/ai/config";
 
+/**
+ * Retries are capped at two and every call has a hard timeout: a stalled
+ * upstream must fail fast rather than hold a serverless function (and a
+ * customer's request) open, and a retry storm must never multiply spend.
+ */
+export const MODEL_CALL_TIMEOUT_MS = 60_000;
+
 export function createAnthropic(config: AIConfig) {
-  return new Anthropic({ apiKey: config.apiKey, maxRetries: 2 });
+  return new Anthropic({ apiKey: config.apiKey, maxRetries: 2, timeout: MODEL_CALL_TIMEOUT_MS });
 }
 
 export class AINotConfiguredError extends Error {

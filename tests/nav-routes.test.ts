@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ADMIN_NAV, SETTINGS_NAV } from "@/lib/nav";
+import { ADMIN_NAV, PLATFORM_NAV, SETTINGS_NAV } from "@/lib/nav";
 
 /**
  * Every link the operator can click in the primary navigation must resolve to a
@@ -21,7 +21,8 @@ function pageFileForHref(href: string): string {
 
 const adminHrefs = ADMIN_NAV.flatMap((group) => group.items.map((item) => item.href));
 const settingsHrefs = SETTINGS_NAV.flatMap((group) => group.items.map((item) => item.href));
-const allHrefs = [...new Set([...adminHrefs, ...settingsHrefs])];
+const platformHrefs = PLATFORM_NAV.flatMap((group) => group.items.map((item) => item.href));
+const allHrefs = [...new Set([...adminHrefs, ...settingsHrefs, ...platformHrefs])];
 
 describe("navigation routes resolve to real pages", () => {
   it.each(allHrefs)("%s has a page.tsx", (href) => {

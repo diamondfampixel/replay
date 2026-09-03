@@ -3,6 +3,7 @@ import { requireContext } from "@/lib/session";
 import { AdminShell } from "@/components/admin/shell";
 import { isAIConfigured } from "@/lib/ai/config";
 import { VerifyEmailBanner } from "@/components/admin/verify-banner";
+import { isPlatformAdmin } from "@/lib/platform-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       storeSlug={ctx.storeSlug}
       role={ctx.role}
       aiConfigured={aiConfigured}
+      platformAdmin={isPlatformAdmin(ctx.user.email)}
       notifications={notifications.map((n) => ({
         id: n.id,
         type: n.type,

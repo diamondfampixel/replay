@@ -52,3 +52,6 @@ next-env.d.ts
 /public/uploads/*
 !/public/uploads/.gitkeep
 scripts/tmp/
+
+# The template holds names and placeholders only; it must ship with the repo.
+!.env.example

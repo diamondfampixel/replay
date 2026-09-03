@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import type Anthropic from "@anthropic-ai/sdk";
+import Anthropic from "@anthropic-ai/sdk";
 import { getAIConfig } from "@/lib/ai/config";
 import { createAnthropic, providerErrorMessage } from "@/lib/ai/client";
 import { SYSTEM_PROMPT, buildStoreContextParts } from "@/lib/ai/context";
@@ -10,8 +10,14 @@ import {
   appendMessage, ensureTitle, getOrCreateConversation, loadMessages, touchConversation,
   type PendingAction, type StoredToolCall,
 } from "@/lib/ai/conversation";
+import { estimateCostMicros } from "@/lib/ai/pricing";
+import {
+  decisionFor, higherTier, routeRequest, tierForTool, type RequestTier, type RouteDecision,
+} from "@/lib/ai/routing";
 import { apiContext, clientErrorMessage, ValidationError } from "@/lib/services/context";
-import { assertAIWithinBudget, recordAIUsage } from "@/lib/services/billing";
+import {
+  assertAIWithinBudget, recordAIRequest, type AIRequestKind, type AIRequestStatus,
+} from "@/lib/services/billing";
 import { reportError } from "@/lib/monitoring";
 import { rateLimit } from "@/lib/rate-limit";
 
@@ -23,9 +29,43 @@ const bodySchema = z.object({
   conversationId: z.string().optional().nullable(),
 });
 
+// ---------------------------------------------------------------------------
+// Spend safeguards. The customer-visible meter is the action allowance; these
+// exist so one request can never turn into unbounded API spend — a model
+// looping on a tool, a context that keeps growing, a retry storm. Each is a
+// hard stop with a plain message, and every stop is written to the ledger.
+// ---------------------------------------------------------------------------
+/** Model round-trips per request (each may carry several tool calls). */
 const MAX_TOOL_ROUNDS = 8;
+/** Tool calls the model may issue in one round; the rest are refused unexecuted. */
+const MAX_TOOL_USES_PER_ROUND = 10;
+/** Tool calls per request in total. */
+const MAX_TOOL_CALLS_PER_REQUEST = 24;
+/** An identical call (same tool, same input) is refused from its third repeat. */
+const MAX_IDENTICAL_CALLS = 2;
+/** Wall-clock budget for model work; leaves headroom under maxDuration for persistence. */
+const REQUEST_DEADLINE_MS = 95_000;
+/** Context size a single model call may carry before the request is stopped. */
+const MAX_CONTEXT_TOKENS_PER_CALL = 250_000;
+/** Transcript replay caps: messages and characters handed back to the model. */
+const HISTORY_MAX_MESSAGES = 24;
+const HISTORY_MAX_CHARS = 40_000;
+
+/** Estimated spend one request may reach before it is stopped (USD; AI_REQUEST_SPEND_CEILING_USD overrides). */
+export function requestSpendCeilingMicros(): number {
+  const raw = Number(process.env.AI_REQUEST_SPEND_CEILING_USD ?? "");
+  return Number.isFinite(raw) && raw > 0 ? Math.round(raw * 1_000_000) : 600_000;
+}
+
+class GuardStop extends Error {
+  constructor(public readonly guard: string, message: string) {
+    super(message);
+    this.name = "GuardStop";
+  }
+}
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
   const ctx = await apiContext({ actor: "ai" });
   if (!ctx) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
@@ -33,6 +73,15 @@ export async function POST(request: Request) {
   if (!limit.ok) {
     return NextResponse.json(
       { error: `Too many requests. Try again in ${limit.retryAfterSeconds}s.` },
+      { status: 429 },
+    );
+  }
+  // A second, organization-wide window: several seats cannot multiply the
+  // per-user limit into a runaway hour.
+  const orgLimit = await rateLimit(`ai-org:${ctx.organizationId}`, { limit: 150, windowMs: 60 * 60_000 });
+  if (!orgLimit.ok) {
+    return NextResponse.json(
+      { error: `The assistant is busy for this organization. Try again in ${orgLimit.retryAfterSeconds}s.` },
       { status: 429 },
     );
   }
@@ -69,10 +118,25 @@ export async function POST(request: Request) {
   const storeContext = await buildStoreContextParts(ctx.storeId);
   const availableTools = toolsForRole(ctx.role);
   const anthropic = createAnthropic(config);
-  const model = config.model;
+  const defaultModel = config.model;
 
-  // Tokens actually spent this request, straight from the API's own counts.
+  // Route before the first call: read-only questions go to the light tier,
+  // store changes to the standard tier, design work to the design tier. Only
+  // ever escalates during the request.
+  const previousAssistant = [...history].reverse().find((message) => message.role === "assistant");
+  let decision: RouteDecision = routeRequest(
+    parsed.data.message,
+    defaultModel,
+    (previousAssistant?.toolCalls ?? null) as StoredToolCall[] | null,
+  );
+  const initialTier = decision.tier;
+  const modelsUsed = new Set<string>();
+
+  // Tokens actually spent this request, straight from the API's own counts,
+  // and the running cost estimate that the per-request ceiling watches.
   const usage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
+  let spendMicros = 0;
+  let modelCalls = 0;
 
   const cacheEphemeral = { type: "ephemeral" as const };
 
@@ -80,7 +144,8 @@ export async function POST(request: Request) {
   // between requests, so they carry cache breakpoints: the ~8K tokens they
   // weigh are then read from cache at a tenth of the price on every call after
   // the first. Live figures sit after the last breakpoint, where changing them
-  // invalidates nothing.
+  // invalidates nothing. The cache is per model, so the light tier warms its
+  // own copy — still far cheaper than sending the prefix uncached.
   const tools = toAnthropicTools(availableTools).map((tool, index, all) =>
     index === all.length - 1 ? { ...tool, cache_control: cacheEphemeral } : tool,
   );
@@ -111,8 +176,35 @@ export async function POST(request: Request) {
     return [...history.slice(0, -1), { ...last, content }];
   }
 
-  async function callModel(history: Anthropic.MessageParam[], maxTokens: number) {
-    const response = await anthropic.messages.create({
+  function accountFor(response: Anthropic.Message, model: string) {
+    const u = response.usage;
+    const delta = {
+      inputTokens: u?.input_tokens ?? 0,
+      outputTokens: u?.output_tokens ?? 0,
+      cacheReadTokens: u?.cache_read_input_tokens ?? 0,
+      cacheWriteTokens: u?.cache_creation_input_tokens ?? 0,
+    };
+    usage.inputTokens += delta.inputTokens;
+    usage.outputTokens += delta.outputTokens;
+    usage.cacheReadTokens += delta.cacheReadTokens;
+    usage.cacheWriteTokens += delta.cacheWriteTokens;
+    spendMicros += estimateCostMicros(model, delta);
+    modelCalls += 1;
+
+    const contextTokens = delta.inputTokens + delta.cacheReadTokens + delta.cacheWriteTokens;
+    if (contextTokens > MAX_CONTEXT_TOKENS_PER_CALL) {
+      throw new GuardStop("context", "This conversation has grown too large to continue safely. Start a new conversation and try again.");
+    }
+    if (spendMicros > requestSpendCeilingMicros()) {
+      throw new GuardStop("request_spend", "That request grew larger than the assistant allows in one go. Try a narrower request, or split it into steps.");
+    }
+  }
+
+  async function callModel(history: Anthropic.MessageParam[], maxTokens: number, route: RouteDecision) {
+    if (Date.now() - startedAt > REQUEST_DEADLINE_MS) {
+      throw new GuardStop("deadline", "That request took too long to finish. Try a narrower request, or split it into steps.");
+    }
+    const build = (model: string, effort: RouteDecision["effort"]): Anthropic.MessageCreateParamsNonStreaming => ({
       model,
       // Room for a long tool-planning turn; hitting the cap truncates
       // mid-thought and burns a round.
@@ -120,21 +212,39 @@ export async function POST(request: Request) {
       system,
       tools,
       messages: withHistoryBreakpoint(history),
+      ...(effort ? { output_config: { effort } } : {}),
     });
-    usage.inputTokens += response.usage?.input_tokens ?? 0;
-    usage.outputTokens += response.usage?.output_tokens ?? 0;
-    usage.cacheReadTokens += response.usage?.cache_read_input_tokens ?? 0;
-    usage.cacheWriteTokens += response.usage?.cache_creation_input_tokens ?? 0;
-    return response;
+
+    let model = route.model;
+    try {
+      const response = await anthropic.messages.create(build(model, route.effort));
+      modelsUsed.add(model);
+      accountFor(response, model);
+      return response;
+    } catch (error) {
+      // A light-tier model that this key cannot use, or an effort setting the
+      // model rejects, falls back to the default model once — never a loop.
+      const status = error instanceof Anthropic.APIError ? error.status : undefined;
+      const retryable = (status === 404 || status === 400) && (model !== defaultModel || route.effort !== null);
+      if (!retryable) throw error;
+      model = defaultModel;
+      const response = await anthropic.messages.create(build(model, null));
+      modelsUsed.add(model);
+      accountFor(response, model);
+      decision = { ...decision, model, effort: null };
+      return response;
+    }
   }
 
   // Replay the transcript as plain user/assistant turns. Tool traffic from
   // earlier turns is summarised rather than replayed, which keeps the context
-  // small and avoids stale tool_use/tool_result pairing.
-  const messages: Anthropic.MessageParam[] = [];
+  // small and avoids stale tool_use/tool_result pairing. Long conversations
+  // are truncated from the front: the model gets the recent window, not an
+  // ever-growing (ever more expensive) prefix.
+  const replay: Anthropic.MessageParam[] = [];
   for (const message of history) {
     if (message.role === "user") {
-      messages.push({ role: "user", content: message.content });
+      replay.push({ role: "user", content: message.content });
       continue;
     }
     const calls = (message.toolCalls ?? []) as StoredToolCall[];
@@ -146,8 +256,9 @@ export async function POST(request: Request) {
     const summary = calls.length
       ? `${message.content}\n\n[Actions from this turn: ${calls.map(describe).join("; ")}]`
       : message.content;
-    if (summary.trim()) messages.push({ role: "assistant", content: summary });
+    if (summary.trim()) replay.push({ role: "assistant", content: summary });
   }
+  const messages: Anthropic.MessageParam[] = trimHistory(replay);
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -161,12 +272,17 @@ export async function POST(request: Request) {
       // that queues six changes must not silently drop five of them.
       const pendingActions: PendingAction[] = [];
       let finalText = "";
+      let status: AIRequestStatus = "ok";
+      let guard: string | null = null;
+      let highestTier: RequestTier = initialTier;
+      const seenCalls = new Map<string, number>();
+      let refusedRepeats = 0;
 
       try {
         send("start", { conversationId: conversation.id });
 
         for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-          const response = await callModel(messages, 16000);
+          const response = await callModel(messages, decision.maxTokens, decision);
 
           const textBlocks = response.content.filter(
             (block): block is Anthropic.TextBlock => block.type === "text",
@@ -186,8 +302,34 @@ export async function POST(request: Request) {
           messages.push({ role: "assistant", content: response.content });
           const results: Anthropic.ToolResultBlockParam[] = [];
 
-          for (const toolUse of toolUses) {
+          for (const [index, toolUse] of toolUses.entries()) {
             const definition = getTool(toolUse.name);
+
+            // Refusals below are answered with a tool_result so the transcript
+            // stays well-formed; the model is told why and can finish its turn.
+            const signature = `${toolUse.name}:${JSON.stringify(toolUse.input ?? {})}`;
+            const seen = (seenCalls.get(signature) ?? 0) + 1;
+            seenCalls.set(signature, seen);
+            const overRound = index >= MAX_TOOL_USES_PER_ROUND;
+            const overRequest = toolCalls.length >= MAX_TOOL_CALLS_PER_REQUEST;
+            const repeated = seen > MAX_IDENTICAL_CALLS;
+            if (overRound || overRequest || repeated) {
+              if (repeated) refusedRepeats += 1;
+              const reason = repeated
+                ? `You have already called ${toolUse.name} with exactly these arguments; the result has not changed. Use what you have and finish.`
+                : overRequest
+                  ? "This request has reached its tool-call limit. Summarise what has been done and stop."
+                  : "Too many tool calls in one turn; the rest were not run. Finish with what you have.";
+              results.push({ type: "tool_result", tool_use_id: toolUse.id, content: reason, is_error: true });
+              if (refusedRepeats >= 3 || overRequest) {
+                throw new GuardStop(
+                  repeated ? "tool_loop" : "tool_calls",
+                  "The assistant stopped: it was repeating the same step. What it completed so far is saved; try rephrasing the request.",
+                );
+              }
+              continue;
+            }
+
             send("tool_start", {
               id: toolUse.id,
               name: toolUse.name,
@@ -199,6 +341,11 @@ export async function POST(request: Request) {
               conversationId: conversation.id,
               prompt: parsed.data.message,
             });
+
+            // Escalate the tier for the rest of the request if the model
+            // reached for heavier work than the message suggested.
+            const toolRisk = outcome.status === "failed" ? (definition?.risk ?? "read") : outcome.risk;
+            highestTier = higherTier(highestTier, tierForTool(toolUse.name, toolRisk));
 
             if (outcome.status === "executed") {
               toolCalls.push({
@@ -277,10 +424,14 @@ export async function POST(request: Request) {
 
           messages.push({ role: "user", content: results });
 
+          if (highestTier !== decision.tier) {
+            decision = decisionFor(highestTier, defaultModel);
+          }
+
           // Once something is waiting on a human, let the model close its turn
           // and stop rather than pushing further changes.
           if (pendingActions.length) {
-            const closing = await callModel(messages, 512);
+            const closing = await callModel(messages, 512, decision);
             const closingText = closing.content
               .filter((block): block is Anthropic.TextBlock => block.type === "text")
               .map((block) => block.text)
@@ -298,22 +449,45 @@ export async function POST(request: Request) {
         await touchConversation(conversation.id);
         send("done", { conversationId: conversation.id });
       } catch (error) {
-        reportError("api/ai/chat", error, { storeId: ctx.storeId });
-        const message =
-          providerErrorMessage(error) ??
-          clientErrorMessage(error, "The assistant could not complete that request.");
+        let message: string;
+        if (error instanceof GuardStop) {
+          status = "guard";
+          guard = error.guard;
+          message = error.message;
+        } else {
+          status = "error";
+          reportError("api/ai/chat", error, { storeId: ctx.storeId });
+          message =
+            providerErrorMessage(error) ??
+            clientErrorMessage(error, "The assistant could not complete that request.");
+        }
         send("error", { error: message });
         await appendMessage(
           conversation.id,
           "assistant",
-          finalText || `I hit an error: ${message}`,
-          { toolCalls },
+          finalText ? `${finalText}\n\n${message}` : message,
+          { toolCalls, pendingAction: pendingActions },
         ).catch(() => undefined);
       } finally {
         // One customer-facing "AI action" per message sent, plus the exact
-        // token spend. Metering never breaks a conversation that already ran.
-        if (usage.inputTokens || usage.outputTokens) {
-          await recordAIUsage(ctx.organizationId, { actions: 1, ...usage }).catch(() => undefined);
+        // token spend and what kind of work it was. Metering never breaks a
+        // conversation that already ran, and a request that never reached the
+        // model costs nothing.
+        if (modelCalls > 0) {
+          await recordAIRequest(ctx.organizationId, {
+            storeId: ctx.storeId,
+            userId: ctx.userId,
+            kind: kindFor(highestTier, toolCalls),
+            tier: highestTier,
+            model: [...modelsUsed].join("+") || decision.model,
+            modelCalls,
+            toolCalls: toolCalls.length,
+            usage,
+            status,
+            guard,
+            durationMs: Date.now() - startedAt,
+            actions: 1,
+          });
         }
         controller.close();
       }
@@ -327,4 +501,27 @@ export async function POST(request: Request) {
       Connection: "keep-alive",
     },
   });
+}
+
+/** Keeps the most recent turns within the message and character caps. */
+function trimHistory(replay: Anthropic.MessageParam[]): Anthropic.MessageParam[] {
+  let kept = replay.slice(-HISTORY_MAX_MESSAGES);
+  const size = (m: Anthropic.MessageParam) => (typeof m.content === "string" ? m.content.length : JSON.stringify(m.content).length);
+  let total = kept.reduce((sum, m) => sum + size(m), 0);
+  while (kept.length > 2 && total > HISTORY_MAX_CHARS) {
+    total -= size(kept[0]);
+    kept = kept.slice(1);
+  }
+  // The replay must open with a user turn.
+  while (kept.length && kept[0].role !== "user") kept = kept.slice(1);
+  if (kept.length < replay.length && kept.length) {
+    kept = [{ role: "user", content: "[Earlier conversation omitted for length.]" }, { role: "assistant", content: "Understood." }, ...kept];
+  }
+  return kept;
+}
+
+function kindFor(tier: RequestTier, calls: StoredToolCall[]): AIRequestKind {
+  if (tier === "design") return "chat_design";
+  if (!calls.length) return "chat";
+  return calls.some((call) => call.risk && call.risk !== "read") ? "chat_write" : "chat_read";
 }

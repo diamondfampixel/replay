@@ -3,6 +3,9 @@ import { z } from "zod";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { getAIConfig } from "@/lib/ai/config";
+import { supportsEffort } from "@/lib/ai/routing";
+import { getAIBudget, recordAIRequest } from "@/lib/services/billing";
+import { prisma } from "@/lib/db";
 import { createAnthropic, extractJson } from "@/lib/ai/client";
 import { SECTION_META, SECTION_TYPES, normaliseSectionConfig } from "@/lib/storefront/sections";
 import { describeSectionFields } from "@/lib/storefront/section-fields";
@@ -87,6 +90,21 @@ export async function generateStoreConfig(
   const config = await getAIConfig(storeId);
   if (!config || !input.generateWithAI) return templateStore(input, theme, context);
 
+  // Onboarding generation is a real AI request: it counts as one action and
+  // respects the allowance like any other. Onboarding must always complete,
+  // so an exhausted allowance means the deterministic template, not an error.
+  const store = await prisma.store.findUnique({ where: { id: storeId }, select: { organizationId: true } });
+  if (!store) return templateStore(input, theme, context);
+  try {
+    const budget = await getAIBudget(store.organizationId);
+    if (budget.exhausted || budget.spendCeilingReached || budget.platformPaused) {
+      return templateStore(input, theme, context);
+    }
+  } catch {
+    return templateStore(input, theme, context);
+  }
+  const startedAt = Date.now();
+
   const wantedSections = input.sections.length
     ? input.sections.join(", ")
     : "hero, featuredProducts, benefits, newsletter";
@@ -117,8 +135,26 @@ export async function generateStoreConfig(
     const response = await anthropic.messages.create({
       model: config.model,
       max_tokens: 3000,
+      ...(supportsEffort(config.model) ? { output_config: { effort: "medium" as const } } : {}),
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userPrompt }],
+    });
+    await recordAIRequest(store.organizationId, {
+      storeId,
+      kind: "onboarding",
+      tier: "standard",
+      model: config.model,
+      modelCalls: 1,
+      toolCalls: 0,
+      usage: {
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+        cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+      },
+      status: "ok",
+      durationMs: Date.now() - startedAt,
+      actions: 1,
     });
 
     const text = response.content

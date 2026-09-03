@@ -21,6 +21,7 @@ export function AdminShell({
   role,
   notifications,
   aiConfigured,
+  platformAdmin = false,
   children,
 }: {
   user: { name: string; email: string };
@@ -30,6 +31,8 @@ export function AdminShell({
   role: Role;
   notifications: TopbarNotification[];
   aiConfigured: boolean;
+  /** Halyard operators see the platform economics report. */
+  platformAdmin?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -64,6 +67,7 @@ export function AdminShell({
               storeName={storeName}
               collapsed={collapsed}
               onToggle={toggle}
+              platformAdmin={platformAdmin}
             />
           </aside>
 
@@ -77,6 +81,7 @@ export function AdminShell({
                 collapsed={false}
                 onToggle={() => setMobileOpen(false)}
                 onNavigate={() => setMobileOpen(false)}
+                platformAdmin={platformAdmin}
               />
             </SheetContent>
           </Sheet>

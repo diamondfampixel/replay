@@ -1,6 +1,8 @@
 import "server-only";
 import { prisma } from "@/lib/db";
-import { getPlan, isPlanId, type Plan } from "@/lib/plans";
+import { getPlan, isPlanId, PLANS, type Plan } from "@/lib/plans";
+import { estimateCostMicros, type TokenUsage } from "@/lib/ai/pricing";
+import { reportAlert, reportError } from "@/lib/monitoring";
 import {
   audit, authorize, NotFoundError, ValidationError, type ServiceContext,
 } from "@/lib/services/context";
@@ -35,54 +37,124 @@ export type AIBudget = {
   remaining: number | null;
   /** True when the next action would exceed the plan's budget. */
   exhausted: boolean;
+  /**
+   * Estimated Anthropic spend (micro-dollars) inside the plan's meter window —
+   * this month on paid plans, all-time on Harbor. Internal; never shown.
+   */
+  spendMicros: number;
+  /** The internal safety ceiling was reached: the assistant pauses even with actions left. */
+  spendCeilingReached: boolean;
+  /** Halyard-wide daily ceiling (AI_PLATFORM_DAILY_SPEND_CEILING_USD) was reached. */
+  platformPaused: boolean;
 };
+
+const MICROS_PER_CENT = 10_000;
+
+/** Today's estimated spend across every organization, in micro-dollars. */
+export async function getPlatformSpendToday(): Promise<number> {
+  const today = await prisma.aIUsageDay.aggregate({
+    where: { day: utcToday() },
+    _sum: { estimatedCostMicros: true },
+  });
+  return today._sum.estimatedCostMicros ?? 0;
+}
+
+/** Optional platform-wide daily brake, in USD. Unset = no platform ceiling. */
+export function platformDailyCeilingMicros(): number | null {
+  const raw = Number(process.env.AI_PLATFORM_DAILY_SPEND_CEILING_USD ?? "");
+  return Number.isFinite(raw) && raw > 0 ? Math.round(raw * 1_000_000) : null;
+}
 
 export async function getAIBudget(organizationId: string): Promise<AIBudget> {
   const plan = await getOrganizationPlan(organizationId);
 
-  const [month, allTime] = await Promise.all([
+  const [month, allTime, platformToday] = await Promise.all([
     prisma.aIUsageDay.aggregate({
       where: { organizationId, day: { gte: utcMonthStart() } },
-      _sum: { actions: true },
+      _sum: { actions: true, estimatedCostMicros: true },
     }),
     prisma.aIUsageDay.aggregate({
       where: { organizationId },
-      _sum: { actions: true },
+      _sum: { actions: true, estimatedCostMicros: true },
     }),
+    platformDailyCeilingMicros() !== null ? getPlatformSpendToday() : Promise.resolve(0),
   ]);
 
   const usedThisMonth = month._sum.actions ?? 0;
   const usedAllTime = allTime._sum.actions ?? 0;
+  const lifetimeMeter = plan.limits.aiStarterActions !== null;
 
   let remaining: number | null = null;
-  if (plan.limits.aiStarterActions !== null) {
+  if (lifetimeMeter) {
     // The free allowance is one-time: spent across the account's whole life,
     // never refilled. Free is for building; a refilling drip would let a live
     // business run on our API bill indefinitely.
-    remaining = Math.max(0, plan.limits.aiStarterActions - usedAllTime);
+    remaining = Math.max(0, plan.limits.aiStarterActions! - usedAllTime);
   } else if (plan.limits.aiActionsPerMonth !== null) {
     remaining = Math.max(0, plan.limits.aiActionsPerMonth - usedThisMonth);
   }
 
-  return { plan, usedThisMonth, usedAllTime, remaining, exhausted: remaining === 0 };
+  // Second, invisible meter: estimated dollars. The action allowance is what
+  // customers see; this one exists so an abnormal run of very expensive
+  // actions (or a bug) cannot outspend the subscription.
+  const spendMicros = lifetimeMeter
+    ? (allTime._sum.estimatedCostMicros ?? 0)
+    : (month._sum.estimatedCostMicros ?? 0);
+  const spendCeilingReached = spendMicros >= plan.limits.aiSpendCeilingCents * MICROS_PER_CENT;
+
+  const platformCeiling = platformDailyCeilingMicros();
+  const platformPaused = platformCeiling !== null && platformToday >= platformCeiling;
+
+  return {
+    plan,
+    usedThisMonth,
+    usedAllTime,
+    remaining,
+    exhausted: remaining === 0,
+    spendMicros,
+    spendCeilingReached,
+    platformPaused,
+  };
 }
+
+const FIRST_PAID_PLAN = PLANS.find((plan) => plan.limits.aiActionsPerMonth !== null)!;
 
 /**
  * Called before the assistant does any work. The message names the meter that
- * ran out so the operator knows whether waiting or upgrading fixes it.
+ * ran out so the operator knows whether waiting or upgrading fixes it. The
+ * dollar ceilings deliberately read as a usage limit, not a price.
  */
 export async function assertAIWithinBudget(organizationId: string): Promise<AIBudget> {
   const budget = await getAIBudget(organizationId);
-  if (!budget.exhausted) return budget;
+  const { plan } = budget;
+  const lifetimeMeter = plan.limits.aiStarterActions !== null;
 
-  if (budget.plan.limits.aiStarterActions !== null) {
+  if (budget.platformPaused) {
     throw new ValidationError(
-      `You've used all ${budget.plan.limits.aiStarterActions} of Harbor's starter AI actions. Paid plans include a monthly allowance — from 300 actions on Skiff.`,
+      "The assistant is paused for a short while across Halyard. Nothing else is affected — please try again later.",
     );
   }
-  throw new ValidationError(
-    `You've used this month's ${budget.plan.limits.aiActionsPerMonth} AI actions on the ${budget.plan.name} plan. Upgrade to keep going, or they reset next month.`,
-  );
+
+  if (budget.exhausted) {
+    if (lifetimeMeter) {
+      throw new ValidationError(
+        `You've used all ${plan.limits.aiStarterActions} of ${plan.name}'s starter AI actions. Paid plans include a monthly allowance — from ${FIRST_PAID_PLAN.limits.aiActionsPerMonth} actions on ${FIRST_PAID_PLAN.name}.`,
+      );
+    }
+    throw new ValidationError(
+      `You've used this month's ${plan.limits.aiActionsPerMonth} AI actions on the ${plan.name} plan. Upgrade to keep going, or they reset next month.`,
+    );
+  }
+
+  if (budget.spendCeilingReached) {
+    throw new ValidationError(
+      lifetimeMeter
+        ? `The assistant has reached ${plan.name}'s usage limit. Upgrade to a paid plan to keep going.`
+        : `The assistant has reached this month's usage limit on the ${plan.name} plan. It resets next month; upgrading raises it.`,
+    );
+  }
+
+  return budget;
 }
 
 export type AIUsageDelta = {
@@ -91,6 +163,7 @@ export type AIUsageDelta = {
   outputTokens?: number;
   cacheReadTokens?: number;
   cacheWriteTokens?: number;
+  estimatedCostMicros?: number;
 };
 
 /**
@@ -106,6 +179,7 @@ export async function recordAIUsage(organizationId: string, delta: AIUsageDelta)
     outputTokens: delta.outputTokens ?? 0,
     cacheReadTokens: delta.cacheReadTokens ?? 0,
     cacheWriteTokens: delta.cacheWriteTokens ?? 0,
+    estimatedCostMicros: delta.estimatedCostMicros ?? 0,
   };
   await prisma.aIUsageDay.upsert({
     where: { organizationId_day: { organizationId, day } },
@@ -116,8 +190,96 @@ export async function recordAIUsage(organizationId: string, delta: AIUsageDelta)
       outputTokens: { increment: increments.outputTokens },
       cacheReadTokens: { increment: increments.cacheReadTokens },
       cacheWriteTokens: { increment: increments.cacheWriteTokens },
+      estimatedCostMicros: { increment: increments.estimatedCostMicros },
     },
   });
+}
+
+export type AIRequestKind = "chat" | "chat_read" | "chat_write" | "chat_design" | "variants" | "onboarding";
+export type AIRequestTier = "light" | "standard" | "design";
+export type AIRequestStatus = "ok" | "error" | "guard" | "budget";
+
+export type AIRequestEntry = {
+  storeId?: string | null;
+  userId?: string | null;
+  kind: AIRequestKind;
+  tier: AIRequestTier;
+  model: string;
+  modelCalls: number;
+  toolCalls: number;
+  usage: Partial<TokenUsage>;
+  status: AIRequestStatus;
+  guard?: string | null;
+  durationMs: number;
+  /** Customer-visible actions to charge (normally 1; 0 when nothing was served). */
+  actions: number;
+};
+
+/** A single request costing more than this is reported as abnormal. */
+export const ABNORMAL_REQUEST_MICROS = 500_000; // $0.50
+
+/**
+ * The economics ledger: one row per real AI request plus the day-level
+ * increment the budgets read. Also the place abnormal use is noticed — a
+ * request far above the norm, or an organization crossing its ceiling — and
+ * reported to the monitoring webhook. Never throws to its caller.
+ */
+export async function recordAIRequest(organizationId: string, entry: AIRequestEntry) {
+  try {
+    const plan = await getOrganizationPlan(organizationId);
+    const usage = {
+      inputTokens: entry.usage.inputTokens ?? 0,
+      outputTokens: entry.usage.outputTokens ?? 0,
+      cacheReadTokens: entry.usage.cacheReadTokens ?? 0,
+      cacheWriteTokens: entry.usage.cacheWriteTokens ?? 0,
+    };
+    const estimatedCostMicros = estimateCostMicros(entry.model, usage);
+
+    await prisma.aIRequest.create({
+      data: {
+        organizationId,
+        storeId: entry.storeId ?? null,
+        userId: entry.userId ?? null,
+        plan: plan.id,
+        kind: entry.kind,
+        tier: entry.tier,
+        model: entry.model,
+        modelCalls: entry.modelCalls,
+        toolCalls: entry.toolCalls,
+        ...usage,
+        estimatedCostMicros,
+        status: entry.status,
+        guard: entry.guard ?? null,
+        durationMs: entry.durationMs,
+      },
+    });
+    await recordAIUsage(organizationId, { actions: entry.actions, ...usage, estimatedCostMicros });
+
+    if (estimatedCostMicros >= ABNORMAL_REQUEST_MICROS) {
+      reportAlert("ai/abnormal-request", `AI request cost ≈ $${(estimatedCostMicros / 1e6).toFixed(2)} (${entry.kind}, ${entry.model})`, {
+        organizationId, plan: plan.id, kind: entry.kind, modelCalls: entry.modelCalls, toolCalls: entry.toolCalls, status: entry.status,
+      });
+    }
+    if (entry.status === "guard") {
+      reportAlert("ai/guard", `AI safeguard stopped a request: ${entry.guard}`, { organizationId, plan: plan.id, kind: entry.kind });
+    }
+
+    const budget = await getAIBudget(organizationId);
+    const ceilingMicros = plan.limits.aiSpendCeilingCents * MICROS_PER_CENT;
+    const before = budget.spendMicros - estimatedCostMicros;
+    for (const fraction of [0.8, 1]) {
+      const line = ceilingMicros * fraction;
+      if (before < line && budget.spendMicros >= line) {
+        reportAlert(
+          "ai/spend-ceiling",
+          `Organization reached ${Math.round(fraction * 100)}% of its ${plan.name} AI spend ceiling`,
+          { organizationId, plan: plan.id, spendUsd: Number((budget.spendMicros / 1e6).toFixed(2)), actions: budget.usedThisMonth },
+        );
+      }
+    }
+  } catch (error) {
+    reportError("billing/recordAIRequest", error, { organizationId });
+  }
 }
 
 // -- plan limit checks used by the write services ---------------------------
