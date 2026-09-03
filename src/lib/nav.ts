@@ -72,6 +72,7 @@ export const ADMIN_NAV: NavGroup[] = [
     label: "Storefront",
     items: [
       { label: "Store", href: "/admin/store", icon: "Store", capability: "storefront:read" },
+      { label: "Themes", href: "/admin/store/themes", icon: "Palette", capability: "storefront:read" },
       { label: "Content", href: "/admin/content", icon: "FileText", capability: "content:read" },
       { label: "Media", href: "/admin/media", icon: "Image", capability: "content:read" },
     ],

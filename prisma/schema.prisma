@@ -105,6 +105,7 @@ model Organization {
   stores      Store[]
   auditLogs   AuditLog[]
   aiUsage     AIUsageDay[]
+  themePurchases ThemePurchase[]
 }
 
 enum SubscriptionStatus {
@@ -185,6 +186,8 @@ model Store {
   // Structured storefront design system (see src/lib/storefront/theme.ts).
   // A direction preset plus optional per-token overrides; null = defaults.
   theme          Json?
+  // The catalogue theme last applied (src/lib/storefront/themes); informational.
+  activeThemeId  String?
 
   // commerce config
   currency     String  @default("USD")
@@ -308,6 +311,25 @@ model Page {
 
   @@unique([storeId, slug])
   @@index([storeId])
+}
+
+/// A one-time premium theme purchase. Ownership is recorded per organization
+/// (a working assumption flagged for the owner's decision); Stripe Checkout in
+/// payment mode creates it via the signed webhook, never the client.
+model ThemePurchase {
+  id                    String   @id @default(cuid())
+  organizationId        String
+  themeId               String
+  amountCents           Int
+  currency              String   @default("usd")
+  status                String   @default("PAID") // PAID | REFUNDED
+  stripeSessionId       String?  @unique
+  stripePaymentIntentId String?
+  createdAt             DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, themeId])
 }
 
 /// A point-in-time copy of a store's whole design (theme + every page's

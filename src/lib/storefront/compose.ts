@@ -122,6 +122,39 @@ export function composeHomepage(theme: ThemeLike, brief: ComposeBrief): Composed
   return out.filter((s, i) => i === 0 || s.type !== out[i - 1].type);
 }
 
+/**
+ * Recipe-driven composition (themes). A theme supplies the structure — which
+ * sections, which compositions, which per-section design — and the brief
+ * supplies honest content through the same builders as the directions.
+ */
+export type RecipeSlot = { type: SectionType; layout?: string; design?: Record<string, unknown>; config?: Record<string, unknown>; /** Include even when the brief has no facts for it (renders its empty state in preview). */ always?: boolean };
+
+const BUILDER: Partial<Record<SectionType, (b: ComposeBrief, t: ThemeLike) => Record<string, unknown> | null>> = {
+  hero: HERO.patch, featuredProducts: FEATURED("grid").patch, imageText: ABOUT("split").patch, collectionGrid: COLLECTIONS("cards").patch,
+  reviews: REVIEWS.patch, newsletter: NEWSLETTER("centered").patch, benefits: BENEFITS("columns").patch, valueProps: VALUE_PROPS.patch,
+  faq: FAQ("accordion").patch, stats: STATS("row").patch, marquee: MARQUEE("md").patch, quote: QUOTE("large").patch,
+  announcement: ANNOUNCE("static", "ink").patch, text: STATEMENT.patch, featuredProduct: FEATURED_PRODUCT("split").patch, story: STORY.patch,
+  productGrid: (b) => ({ heading: b.goal === "launch" ? "Everything" : "All products", limit: Math.min(12, Math.max(3, b.catalog.productCount || 8)) }),
+  testimonials: () => ({ items: [] }), gallery: () => ({ items: [] }), fullImage: () => ({}), logoList: () => ({ items: [] }),
+  imageHero: (b) => ({ headline: short(b.tagline, 90) || b.name, subheadline: short(b.description, 150) }),
+  videoHero: (b) => ({ headline: short(b.tagline, 90) || b.name, subheadline: short(b.description, 150) }),
+  collectionHero: (b) => (b.catalog.collectionSlugs[0] ? { collectionSlug: b.catalog.collectionSlugs[0] } : null),
+  customBanner: (b) => (b.facts?.announcement ? { heading: b.facts.announcement, ctaLabel: "Shop now", ctaHref: "/shop" } : null),
+};
+
+export function composeFromRecipe(theme: ThemeLike, brief: ComposeBrief, recipe: RecipeSlot[]): ComposedSection[] {
+  const out: ComposedSection[] = [];
+  for (const slot of recipe) {
+    const build = BUILDER[slot.type];
+    const patch = build ? build(brief, theme) : {};
+    if (patch === null && !slot.always) continue;
+    const base = sectionDefaultsFor(slot.type, theme);
+    const design = { ...(base.design as Record<string, unknown>), ...(slot.design ?? {}) };
+    out.push({ type: slot.type, config: { ...base, ...(patch ?? {}), ...(slot.config ?? {}), ...(slot.layout ? { layout: slot.layout } : {}), design } });
+  }
+  return out.filter((s, i) => i === 0 || s.type !== out[i - 1].type);
+}
+
 const EXTRA: Partial<Record<SectionType, Slot>> = {
   featuredProducts: FEATURED("grid"), imageText: ABOUT("split"), collectionGrid: COLLECTIONS("cards"), reviews: REVIEWS, faq: FAQ("accordion"),
   benefits: BENEFITS("columns"), newsletter: NEWSLETTER("centered"), announcement: ANNOUNCE("static", "ink"), testimonials: { type: "testimonials", patch: () => ({ items: [] }) },

@@ -58,6 +58,12 @@ export default async function StorePage() {
                 View store
               </a>
             </Button>
+            <Button asChild size="sm" variant="secondary">
+              <Link href="/admin/store/themes">
+                <Palette />
+                Themes
+              </Link>
+            </Button>
             {canWrite && (
               <Button asChild size="sm" variant="primary">
                 <Link href="/admin/store/editor">

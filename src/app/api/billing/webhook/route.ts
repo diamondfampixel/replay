@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordThemePurchase } from "@/lib/services/themes";
 import type Stripe from "stripe";
 import { prisma } from "@/lib/db";
 import { reportError } from "@/lib/monitoring";
@@ -40,6 +41,17 @@ export async function POST(request: Request) {
       case "checkout.session.completed": {
         const session = event.data.object;
         const organizationId = session.client_reference_id;
+        // One-time theme purchase: record ownership from the verified event only.
+        if (session.mode === "payment" && session.metadata?.kind === "theme" && session.metadata.themeId && session.metadata.organizationId && session.payment_status === "paid") {
+          await recordThemePurchase({
+            organizationId: session.metadata.organizationId,
+            themeId: session.metadata.themeId,
+            amountCents: session.amount_total ?? 0,
+            currency: session.currency ?? "usd",
+            stripeSessionId: session.id,
+            stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : null,
+          });
+        }
         if (organizationId && typeof session.customer === "string") {
           await prisma.organization.update({
             where: { id: organizationId },
