@@ -6,40 +6,57 @@ have free tiers and the whole thing takes about ten minutes.
 
 ## 1. Database (Neon)
 
-1. Sign up at [neon.tech](https://neon.tech) and create a project.
-2. Copy the connection string it shows you (the pooled one, ending in
-   `?sslmode=require`).
-3. That string is your `DATABASE_URL`.
+The Neon project already exists (`flat-fire-69428670`, branch `production`).
+Neon gives two connection strings for it:
 
-Any managed PostgreSQL 15+ works the same way — Vercel Postgres, Supabase,
-Railway, RDS. Use the pooled/connection-pooler URL if the host offers one.
+- the **pooled** string — host contains `-pooler` — for the running app;
+- the **direct** string — no `-pooler` — for migrations only.
+
+Both carry credentials: keep them in environment variables, never in git.
+Any managed PostgreSQL 15+ works the same way — use the pooled URL at runtime
+and the direct URL for `prisma migrate deploy` if the host offers both.
 
 ## 2. App (Vercel)
 
 Either click the button in the README, or by hand:
 
 1. Sign up at [vercel.com](https://vercel.com) with your GitHub account.
-2. **Add New → Project** and import `diamondfampixel/replay`.
-3. Framework is auto-detected as Next.js; leave build settings alone —
-   `npm run build` already runs `prisma generate`.
+2. **Add New → Project** and import `diamondfampixel/replay`, branch
+   `claude/ai-ecommerce-platform-ge4e8c` (or the branch you merged it into).
+3. Framework is auto-detected as Next.js; leave build settings alone. The
+   repo defines a `vercel-build` script that runs `prisma migrate deploy`
+   before `next build`, so every deploy applies pending migrations using the
+   direct URL.
 4. Add the environment variables:
 
    | Variable | Value |
    |---|---|
-   | `DATABASE_URL` | the Neon string from step 1 |
+   | `DATABASE_URL` | the Neon **pooled** string |
+   | `DATABASE_URL_UNPOOLED` | the Neon **direct** string (migrations) |
    | `AUTH_SECRET` | output of `openssl rand -base64 32` |
    | `NEXT_PUBLIC_APP_URL` | your Vercel URL, e.g. `https://halyard.vercel.app` (you can set it after the first deploy) |
-   | `ANTHROPIC_API_KEY` | optional — enables the AI assistant |
-   | `ANTHROPIC_MODEL` | optional — defaults to `claude-opus-5` |
+   | `LAUNCH_STAGE` | `waitlist` until you open sign-up |
+   | `WAITLIST_INVITE_CODES` | comma-separated codes for invited testers |
+   | `HALYARD_ANTHROPIC_KEY` | enables the AI assistant |
+   | `ANTHROPIC_MODEL` | optional — defaults to `claude-sonnet-5` |
 
-5. Deploy.
+   Optional but strongly recommended before real users: `SUPABASE_*`
+   (uploads), `RESEND_API_KEY` + `EMAIL_FROM` (password reset), `UPSTASH_*`
+   (rate limits), `MONITORING_WEBHOOK_URL` (errors and AI alerts),
+   `HALYARD_PLATFORM_ADMINS` (economics report). See `.env.example`.
+
+5. Deploy. The build log shows `prisma migrate deploy` applying the
+   migrations, then the Next.js build.
 
 ## 3. Migrate — and do not seed production
 
-From your machine, with the production `DATABASE_URL`:
+The Vercel build applies migrations automatically (step 2). To run them
+yourself instead, from a machine that can reach Neon, with the **direct**
+string:
 
 ```bash
-DATABASE_URL="<neon url>" npx prisma migrate deploy
+DATABASE_URL="<neon direct url>" npx prisma migrate deploy
+DATABASE_URL="<neon direct url>" npx prisma migrate status
 ```
 
 **Do not run `npm run db:seed` against a production database.** The seed
