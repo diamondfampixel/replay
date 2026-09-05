@@ -1,6 +1,7 @@
 import "dotenv/config";
 import path from "node:path";
 import { defineConfig } from "prisma/config";
+import { normalizeDatabaseUrl } from "./src/lib/database-url";
 
 export default defineConfig({
   schema: path.join("prisma", "schema.prisma"),
@@ -15,6 +16,7 @@ export default defineConfig({
     // Neon CLI provides a plain DATABASE_URL that is already direct. Runtime
     // code keeps using DATABASE_URL (src/lib/db.ts), which should be the
     // pooled string on serverless hosts.
-    url: (process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL) as string,
+    url: (normalizeDatabaseUrl(process.env.DATABASE_URL_UNPOOLED, "DATABASE_URL_UNPOOLED") ||
+      normalizeDatabaseUrl(process.env.DATABASE_URL)) as string,
   },
 });
