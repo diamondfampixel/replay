@@ -30,7 +30,7 @@ import {
 const BASE = "https://developers.cjdropshipping.com/api2.0/v1";
 
 const CAPS: ReadonlySet<SourcingCapability> = new Set([
-  "search", "productDetails", "inventory", "shipping", "orders", "tracking", "webhooks",
+  "search", "productDetails", "inventory", "shipping", "orders", "tracking",
 ]);
 
 type TokenBundle = { accessToken: string };

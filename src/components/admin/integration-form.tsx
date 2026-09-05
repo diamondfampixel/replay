@@ -83,7 +83,7 @@ export function IntegrationForm({
 
           {planned ? (
             <p className="rounded-md border border-ink-200 bg-ink-50 px-3 py-2.5 text-[12.5px] text-ink-600">
-              Connecting is disabled for this provider because nothing would read the credentials.
+              Connecting isn&apos;t available for this provider yet.
             </p>
           ) : (
             canWrite && (

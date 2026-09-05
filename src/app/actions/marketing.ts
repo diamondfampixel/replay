@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { serviceContext, audit } from "@/lib/services/context";
+import { serviceContext, audit, authorize } from "@/lib/services/context";
 import { guard, ok } from "@/lib/action-result";
 import {
   createCampaign, deleteCampaign, sendCampaign, updateCampaign, type CampaignInput,
@@ -52,6 +52,7 @@ export async function sendCampaignAction(id: string) {
 export async function setReviewStatusAction(ids: string[], status: ReviewStatus) {
   return guard(async () => {
     const ctx = await serviceContext();
+    authorize(ctx, "content:write");
     const result = await prisma.review.updateMany({
       where: { id: { in: ids }, storeId: ctx.storeId },
       data: { status },
@@ -65,6 +66,7 @@ export async function setReviewStatusAction(ids: string[], status: ReviewStatus)
 export async function deleteReviewsAction(ids: string[]) {
   return guard(async () => {
     const ctx = await serviceContext();
+    authorize(ctx, "content:write");
     const result = await prisma.review.deleteMany({
       where: { id: { in: ids }, storeId: ctx.storeId },
     });
@@ -85,6 +87,7 @@ export async function createReviewAction(input: {
 }) {
   return guard(async () => {
     const ctx = await serviceContext();
+    authorize(ctx, "content:write");
     const product = await prisma.product.findFirst({
       where: { id: input.productId, storeId: ctx.storeId },
     });
@@ -113,6 +116,7 @@ export async function createReviewAction(input: {
 export async function setSubscriberStatusAction(ids: string[], status: "subscribed" | "unsubscribed") {
   return guard(async () => {
     const ctx = await serviceContext();
+    authorize(ctx, "marketing:write");
     const result = await prisma.emailSubscriber.updateMany({
       where: { id: { in: ids }, storeId: ctx.storeId },
       data: { status },
@@ -125,6 +129,7 @@ export async function setSubscriberStatusAction(ids: string[], status: "subscrib
 export async function addSubscriberAction(email: string, name?: string) {
   return guard(async () => {
     const ctx = await serviceContext();
+    authorize(ctx, "marketing:write");
     const normalised = email.trim().toLowerCase();
     const existing = await prisma.emailSubscriber.findFirst({
       where: { storeId: ctx.storeId, email: normalised },

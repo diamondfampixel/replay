@@ -5,6 +5,29 @@ import { INTEGRATION_CATALOG, getIntegration } from "@/lib/integrations/catalog"
 import { createCjProvider } from "@/lib/sourcing/providers/cjdropshipping";
 import { SourcingError } from "@/lib/sourcing/types";
 
+/**
+ * Outbound webhooks only ever go to the provider's own endpoints. Without this
+ * a merchant could aim an "integration" at an internal address and receive
+ * whatever it answered with — a server-side request forgery.
+ */
+const WEBHOOK_HOSTS = {
+  slack: ["hooks.slack.com"],
+  discord: ["discord.com", "discordapp.com"],
+  zapier: ["hooks.zapier.com"],
+  make: ["make.com", "integromat.com"],
+} as const;
+
+function isPrivateHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") || h.endsWith(".internal")) return true;
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
+  }
+  return h.startsWith("[") || h.includes(":"); // no raw IPv6 targets
+}
+
 export type IntegrationView = {
   provider: string;
   status: "NOT_CONFIGURED" | "CONNECTED" | "ERROR" | "DISCONNECTED";
@@ -155,6 +178,11 @@ async function verify(provider: string, config: Record<string, string>): Promise
           return { ok: false, error: "That is not a valid URL." };
         }
         if (parsed.protocol !== "https:") return { ok: false, error: "Webhook URLs must use HTTPS." };
+        const allowed = WEBHOOK_HOSTS[provider as keyof typeof WEBHOOK_HOSTS];
+        if (allowed && !allowed.some((host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`))) {
+          return { ok: false, error: `That is not a ${definition.name} webhook address (expected ${allowed.join(" or ")}).` };
+        }
+        if (isPrivateHost(parsed.hostname)) return { ok: false, error: "Webhook URLs must point at a public address." };
         return { ok: true, label: `${parsed.hostname}${parsed.pathname.slice(0, 20)}…` };
       }
 
@@ -270,10 +298,20 @@ export async function dispatchWebhooks(
           ? { text: `${event}: ${JSON.stringify(payload)}`, content: `${event}: ${JSON.stringify(payload)}` }
           : { event, payload };
 
-      await fetch(config.webhookUrl, {
+      let target: URL | null = null;
+      try { target = new URL(config.webhookUrl); } catch { target = null; }
+      const allowed = WEBHOOK_HOSTS[row.provider as keyof typeof WEBHOOK_HOSTS];
+      if (!target || target.protocol !== "https:" || isPrivateHost(target.hostname) ||
+        (allowed && !allowed.some((host) => target!.hostname === host || target!.hostname.endsWith(`.${host}`)))) {
+        await prisma.integration.update({ where: { id: row.id }, data: { lastError: "Webhook address is not allowed" } });
+        return;
+      }
+      await fetch(target, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        redirect: "manual",
+        signal: AbortSignal.timeout(8000),
       }).catch(async (error) => {
         await prisma.integration.update({
           where: { id: row.id },
@@ -282,4 +320,19 @@ export async function dispatchWebhooks(
       });
     }),
   );
+}
+
+/**
+ * The GA4 measurement id for a store's public pages, when the merchant has
+ * connected Google Analytics. Measurement ids are public by design (they ship
+ * in every page), so this is safe to render into the storefront.
+ */
+export async function storefrontAnalyticsTag(storeId: string): Promise<{ measurementId: string } | null> {
+  const row = await prisma.integration.findUnique({
+    where: { storeId_provider: { storeId, provider: "google_analytics" } },
+    select: { status: true, config: true },
+  });
+  if (!row || row.status !== "CONNECTED") return null;
+  const id = ((row.config ?? {}) as Record<string, string>).measurementId?.trim();
+  return id && /^G-[A-Z0-9]{4,20}$/.test(id) ? { measurementId: id } : null;
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { sanitizeHtml } from "@/lib/sanitize";
 import { prisma } from "@/lib/db";
 import { getStore } from "@/lib/storefront/data";
 import { SectionRenderer } from "@/components/storefront/sections";
@@ -58,9 +59,9 @@ export default async function ContentPage({
       <h1 className="text-[30px] font-semibold tracking-[-0.02em] text-ink-900">{page.title}</h1>
       <div
         className="prose-halyard mt-6"
-        // Page bodies are authored by store staff in the admin, which is a
-        // trusted surface; the storefront renders exactly what was saved.
-        dangerouslySetInnerHTML={{ __html: page.body ?? "" }}
+        // Page bodies are sanitised on write; sanitising again at render is
+        // defence in depth for rows written by any other path.
+        dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.body ?? "") }}
       />
     </article>
   );

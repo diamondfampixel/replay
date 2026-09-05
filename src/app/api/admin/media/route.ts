@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rejectCrossOrigin } from "@/lib/request-origin";
 import { apiContext } from "@/lib/services/context";
 import { listMedia, uploadMedia } from "@/lib/services/media";
 import { rateLimit } from "@/lib/rate-limit";
@@ -25,6 +26,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const ctx = await apiContext();
+  const crossOrigin = rejectCrossOrigin(request);
+  if (crossOrigin) return crossOrigin;
   if (!ctx) return unauthorized();
   try {
     const limit = await rateLimit(`media:${ctx.storeId}`, { limit: 60, windowMs: 60_000 });

@@ -30,6 +30,9 @@ export function generateToken(bytes = 32): string {
 /** Tokens are stored hashed so a database leak cannot be replayed as a session. */
 export function hashToken(token: string): string {
   const secret = process.env.AUTH_SECRET ?? "";
+  if (!secret && process.env.NODE_ENV === "production") {
+    throw new Error("AUTH_SECRET is not set; refusing to issue or verify tokens without it.");
+  }
   return createHash("sha256").update(`${secret}:${token}`).digest("hex");
 }
 

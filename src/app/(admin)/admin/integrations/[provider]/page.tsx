@@ -5,7 +5,7 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import { requireCapability } from "@/lib/session";
 import { serviceContext } from "@/lib/services/context";
 import { getIntegrationView } from "@/lib/services/integrations";
-import { getIntegration, IMPLEMENTATION_LABELS } from "@/lib/integrations/catalog";
+import { getIntegration, availabilityLabel } from "@/lib/integrations/catalog";
 import { can } from "@/lib/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge, Dot } from "@/components/ui/badge";
@@ -66,7 +66,7 @@ export default async function IntegrationDetailPage({
         actions={
           <Badge tone={INTEGRATION_TONE[state?.status ?? "NOT_CONFIGURED"]}>
             {connected && <Dot tone="success" />}
-            {connected ? "Connected" : state?.status === "ERROR" ? "Error" : IMPLEMENTATION_LABELS[definition.implementation]}
+            {connected ? "Connected" : state?.status === "ERROR" ? "Error" : availabilityLabel(definition)}
           </Badge>
         }
       />
@@ -77,21 +77,16 @@ export default async function IntegrationDetailPage({
           <CardContent className="space-y-3">
             <p className="text-[13.5px] leading-relaxed text-ink-700">{definition.capability}</p>
 
-            {definition.implementation === "planned" && (
+            {(definition.implementation === "planned" || definition.requiresHalyardSetup) && (
               <div className="rounded-md border border-ink-200 bg-ink-50 px-3 py-2.5 text-[12.5px] text-ink-600">
-                This connector is a slot, not a working integration. Connecting is disabled rather
-                than storing credentials that nothing would read. The interface, credential storage
-                and audit trail are already in place, so wiring it up is a matter of adding the API
-                calls.
+                {definition.requiresHalyardSetup
+                  ? `${definition.name} requires Halyard to complete an approved developer setup with the provider before any store can connect. Nothing is needed from you; this page will change to Connect when it is ready.`
+                  : "This integration isn't available yet. Connecting is switched off rather than showing a button that does nothing."}
               </div>
             )}
 
-            {definition.envVar && (
-              <p className="text-[12.5px] text-ink-500">
-                Can also be supplied server-side via{" "}
-                <code className="rounded bg-ink-100 px-1 py-0.5 text-[11.5px]">{definition.envVar}</code>.
-                {state?.fromEnvironment && " That environment variable is currently set and takes precedence."}
-              </p>
+            {state?.fromEnvironment && (
+              <p className="text-[12.5px] text-ink-500">This connection is provided by Halyard for every store; nothing to set up.</p>
             )}
 
             {definition.docsUrl && (
@@ -112,7 +107,7 @@ export default async function IntegrationDetailPage({
           provider={definition.id}
           name={definition.name}
           fields={definition.fields}
-          implementation={definition.implementation}
+          implementation={definition.requiresHalyardSetup ? "planned" : definition.implementation}
           connected={connected}
           fromEnvironment={state?.fromEnvironment ?? false}
           configuredKeys={state?.configuredKeys ?? []}

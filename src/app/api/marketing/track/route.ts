@@ -36,7 +36,8 @@ export async function POST(request: Request) {
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ ok: false }, { status: 400 });
 
-  const limit = await rateLimit(`mkt:${parsed.data.visitorId}`, { limit: 60, windowMs: 60_000 });
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const limit = await rateLimit(`mkt:${ip}`, { limit: 120, windowMs: 60_000 });
   if (!limit.ok) return NextResponse.json({ ok: true, throttled: true });
 
   await prisma.marketingEvent

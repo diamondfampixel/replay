@@ -33,6 +33,12 @@ export type IntegrationDefinition = {
   category: IntegrationCategory;
   description: string;
   implementation: IntegrationImplementation;
+  /**
+   * The provider requires Halyard itself to hold an approved developer app,
+   * partner status or OAuth client before any merchant can connect. Merchants
+   * see "Coming soon"; internally this is HALYARD PROVIDER SETUP REQUIRED.
+   */
+  requiresHalyardSetup?: boolean;
   /** What connecting actually does today. Shown verbatim in the UI. */
   capability: string;
   /** Credential fields collected when connecting. Stored server-side only. */
@@ -76,13 +82,12 @@ export const INTEGRATION_CATALOG: IntegrationDefinition[] = [
     description: "Accept card payments and let real transactions drive order state.",
     implementation: "credentials",
     capability:
-      "Stores and validates your secret key against Stripe's account endpoint. Once connected, checkout can be switched from simulated to Stripe in Settings → Payments.",
+      "Stores and validates your Stripe secret key against Stripe's account endpoint so it is ready for shopper checkout. Taking real card payments on your storefront through your own Stripe account is not switched on yet — checkout stays in test/simulated mode until it is, and Settings → Payments says so. (Your Halyard subscription is billed separately through Halyard's own Stripe account.)",
     fields: [
       { key: "secretKey", label: "Secret key", placeholder: "sk_test_…", secret: true },
       { key: "publishableKey", label: "Publishable key", placeholder: "pk_test_…", optional: true },
       { key: "webhookSecret", label: "Webhook signing secret", placeholder: "whsec_…", secret: true, optional: true },
     ],
-    envVar: "STRIPE_SECRET_KEY",
     docsUrl: "https://stripe.com/docs/api",
     mark: "S",
     accent: "#635bff",
@@ -93,6 +98,7 @@ export const INTEGRATION_CATALOG: IntegrationDefinition[] = [
     category: "payments",
     description: "Offer PayPal and Venmo as an additional checkout method.",
     implementation: "planned",
+    requiresHalyardSetup: true,
     capability: "Connector slot only. No PayPal API calls are implemented yet.",
     fields: [
       { key: "clientId", label: "Client ID" },
@@ -161,7 +167,7 @@ export const INTEGRATION_CATALOG: IntegrationDefinition[] = [
     description: "Send storefront events to a GA4 property alongside Halyard analytics.",
     implementation: "credentials",
     capability:
-      "Stores your measurement ID. The storefront will include the GA4 tag; no data is read back into Halyard dashboards.",
+      "Stores your measurement ID and adds the GA4 tag to every storefront page (page views and the standard gtag events). No data is read back into Halyard dashboards.",
     fields: [
       { key: "measurementId", label: "Measurement ID", placeholder: "G-XXXXXXX" },
       { key: "apiSecret", label: "Measurement Protocol API secret", secret: true, optional: true },
@@ -175,6 +181,7 @@ export const INTEGRATION_CATALOG: IntegrationDefinition[] = [
     category: "advertising",
     description: "Attribute paid search traffic and report conversions.",
     implementation: "planned",
+    requiresHalyardSetup: true,
     capability: "Connector slot only. No Google Ads API calls are implemented yet.",
     fields: [{ key: "customerId", label: "Customer ID", placeholder: "123-456-7890" }],
     mark: "Ads",
@@ -200,6 +207,7 @@ export const INTEGRATION_CATALOG: IntegrationDefinition[] = [
     category: "social",
     description: "TikTok pixel and product catalog feed.",
     implementation: "planned",
+    requiresHalyardSetup: true,
     capability: "Connector slot only. No TikTok API calls are implemented yet.",
     fields: [{ key: "pixelId", label: "Pixel ID" }],
     mark: "TT",
@@ -211,6 +219,7 @@ export const INTEGRATION_CATALOG: IntegrationDefinition[] = [
     category: "fulfillment",
     description: "Buy labels and sync tracking numbers back onto orders.",
     implementation: "planned",
+    requiresHalyardSetup: true,
     capability: "Connector slot only. No Shippo API calls are implemented yet.",
     fields: [{ key: "apiToken", label: "API token", secret: true }],
     mark: "SH",
@@ -273,11 +282,8 @@ export const INTEGRATION_CATALOG: IntegrationDefinition[] = [
     implementation: "planned",
     capability:
       "The AliExpress Dropshipping (ds.*) adapter implements signed product search and import; freight, order-create and tracking are documented and a follow-up. AliExpress gates the DS API behind an approved Open Platform app, so merchants can connect only once Halyard holds that approved app (see launch blockers). No supplier webhooks; sync is by polling.",
-    fields: [
-      { key: "appKey", label: "App key" },
-      { key: "appSecret", label: "App secret", secret: true },
-      { key: "session", label: "Merchant OAuth session", secret: true, optional: true },
-    ],
+    requiresHalyardSetup: true,
+    fields: [],
     docsUrl: "https://openservice.aliexpress.com/",
     mark: "AE",
     accent: "#e62e04",
@@ -347,6 +353,7 @@ export const INTEGRATION_CATALOG: IntegrationDefinition[] = [
     category: "accounting",
     description: "Sync orders and refunds into accounting.",
     implementation: "planned",
+    requiresHalyardSetup: true,
     capability: "Connector slot only. No QuickBooks API calls are implemented yet.",
     fields: [{ key: "realmId", label: "Company (realm) ID" }],
     mark: "QB",
@@ -358,6 +365,7 @@ export const INTEGRATION_CATALOG: IntegrationDefinition[] = [
     category: "automation",
     description: "Export orders and product data into a spreadsheet.",
     implementation: "planned",
+    requiresHalyardSetup: true,
     capability: "Connector slot only. OAuth is not implemented yet — CSV export works today from each table.",
     fields: [{ key: "spreadsheetId", label: "Spreadsheet ID" }],
     mark: "GS",
@@ -404,8 +412,23 @@ export function getIntegration(id: string): IntegrationDefinition | undefined {
   return INTEGRATION_CATALOG.find((i) => i.id === id);
 }
 
+/** Merchant-facing state for a connector that is not connected yet. */
 export const IMPLEMENTATION_LABELS: Record<IntegrationImplementation, string> = {
-  live: "Fully wired",
-  credentials: "Credentials only",
-  planned: "Not configured",
+  live: "Available",
+  credentials: "Available",
+  planned: "Coming soon",
 };
+
+/** What a merchant sees on a card that is not connected. */
+export function availabilityLabel(definition: IntegrationDefinition): string {
+  if (definition.requiresHalyardSetup) return "Coming soon";
+  return IMPLEMENTATION_LABELS[definition.implementation];
+}
+
+/** Internal classification, for the platform team and the readiness report. */
+export function internalClassification(definition: IntegrationDefinition): string {
+  if (definition.requiresHalyardSetup) return "HALYARD PROVIDER SETUP REQUIRED";
+  if (definition.implementation === "live") return "IMPLEMENTED — MERCHANT CREDENTIALS REQUIRED";
+  if (definition.implementation === "credentials") return "PARTIAL — CREDENTIALS STORED, LIMITED DATA FLOW";
+  return "RESEARCH ONLY";
+}

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { requireCapability } from "@/lib/session";
 import { serviceContext } from "@/lib/services/context";
-import { listMedia } from "@/lib/services/media";
+import { listMedia, mediaStorage, mediaStorageNeedsSetup } from "@/lib/services/media";
 import { can } from "@/lib/permissions";
 import { PageHeader } from "@/components/ui/page";
 import { MediaLibrary } from "@/components/admin/media-library";
@@ -23,17 +23,22 @@ export default async function MediaPage({
     q: params.q,
   });
 
-  const storageMode =
-    process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
-      ? "Supabase storage"
-      : "local disk";
+  const storage = mediaStorage();
+  const needsSetup = mediaStorageNeedsSetup();
 
   return (
     <div className="mx-auto max-w-[1200px]">
       <PageHeader
         title="Media"
-        description={`${result.total} file${result.total === 1 ? "" : "s"} · stored on ${storageMode}`}
+        description={`${result.total} file${result.total === 1 ? "" : "s"} · stored on ${storage.label}`}
       />
+      {needsSetup && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-900" role="status">
+          <span className="font-semibold">Uploads are paused on this deployment.</span> Durable image storage
+          is not connected yet, so new uploads would be lost on the next deploy. The Halyard team needs to
+          connect Supabase Storage or Vercel Blob; existing files and everything else keep working.
+        </div>
+      )}
       <MediaLibrary
         assets={result.assets.map((asset) => ({
           id: asset.id,

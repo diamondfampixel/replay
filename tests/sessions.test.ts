@@ -187,6 +187,8 @@ describe("email verification", () => {
   });
 
   it("signup verifies immediately when no platform email exists to send with", async () => {
+    // Signup is invite-gated by default now; open it for this test only.
+    process.env.LAUNCH_STAGE = "public";
     const { signupAction } = await import("@/app/actions/auth");
     const form = new FormData();
     const email = `verify-${Date.now()}@example.test`;
@@ -200,5 +202,6 @@ describe("email verification", () => {
     expect(user.emailVerifiedAt).not.toBeNull();
     await testDb.session.deleteMany({ where: { userId: user.id } });
     await testDb.user.delete({ where: { id: user.id } });
+    delete process.env.LAUNCH_STAGE;
   });
 });

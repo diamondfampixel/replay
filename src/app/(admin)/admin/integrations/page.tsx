@@ -4,7 +4,7 @@ import { requireCapability } from "@/lib/session";
 import { serviceContext } from "@/lib/services/context";
 import { listIntegrations } from "@/lib/services/integrations";
 import {
-  INTEGRATION_CATALOG, INTEGRATION_CATEGORIES, IMPLEMENTATION_LABELS,
+  INTEGRATION_CATALOG, INTEGRATION_CATEGORIES, availabilityLabel,
 } from "@/lib/integrations/catalog";
 import { Badge, Dot } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page";
@@ -31,7 +31,6 @@ export default async function IntegrationsPage({
     : INTEGRATION_CATALOG;
 
   const connectedCount = integrations.filter((integration) => integration.status === "CONNECTED").length;
-  const liveCount = INTEGRATION_CATALOG.filter((d) => d.implementation === "live").length;
 
   return (
     <div className="mx-auto max-w-[1200px]">
@@ -41,10 +40,9 @@ export default async function IntegrationsPage({
       />
 
       <div className="mb-4 rounded-lg border border-ink-200 bg-white px-4 py-3 text-[13px] text-ink-600">
-        <span className="font-medium text-ink-900">Each card states what connecting actually does.</span>{" "}
-        {liveCount} connectors are fully wired in this build; some store and validate credentials
-        without moving data yet; the rest are slots waiting to be built. Nothing here shows a
-        connected badge for something that does not work.
+        <span className="font-medium text-ink-900">Each card says exactly what connecting does today.</span>{" "}
+        Available connectors work with your own account details. &ldquo;Coming soon&rdquo; ones are being
+        set up on Halyard&apos;s side or built next — nothing here shows Connected unless it really works.
       </div>
 
       <nav className="mb-5 flex flex-wrap gap-1.5">
@@ -90,7 +88,7 @@ export default async function IntegrationsPage({
                     ? "Connected"
                     : state?.status === "ERROR"
                       ? "Error"
-                      : IMPLEMENTATION_LABELS[definition.implementation]}
+                      : availabilityLabel(definition)}
                 </Badge>
               </div>
 

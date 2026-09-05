@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rejectCrossOrigin } from "@/lib/request-origin";
 import { prisma } from "@/lib/db";
 import { apiContext } from "@/lib/services/context";
 import { can } from "@/lib/permissions";
@@ -7,7 +8,9 @@ import { getStripe, isStripeBillingConfigured } from "@/lib/stripe";
 export const runtime = "nodejs";
 
 /** Opens Stripe's hosted portal: payment method, invoices, cancellation. */
-export async function POST() {
+export async function POST(request: Request) {
+  const crossOrigin = rejectCrossOrigin(request);
+  if (crossOrigin) return crossOrigin;
   const ctx = await apiContext();
   if (!ctx) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   if (!can(ctx.role, "billing:manage")) {

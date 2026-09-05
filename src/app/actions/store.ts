@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { serviceContext } from "@/lib/services/context";
+import { serviceContext, authorize, ValidationError } from "@/lib/services/context";
 import { guard, ok, fail } from "@/lib/action-result";
 import {
   createContentPage, deleteContentPage, discardDraft, publishPage,
@@ -48,6 +48,7 @@ export async function discardDraftAction(pageId: string) {
 export async function setStoreStatusAction(status: "DRAFT" | "ACTIVE" | "PAUSED") {
   return guard(async () => {
     const ctx = await serviceContext();
+    authorize(ctx, "settings:write");
     await prisma.store.update({ where: { id: ctx.storeId }, data: { status } });
     await audit(ctx, "store.status", { type: "Store", id: ctx.storeId }, { status });
     revalidatePath("/admin/store");
@@ -179,6 +180,13 @@ export async function updateNavigationAction(
 ) {
   return guard(async () => {
     const ctx = await serviceContext();
+    authorize(ctx, "storefront:write");
+    for (const item of items) {
+      if (!item.label?.trim() || item.label.length > 60) throw new ValidationError("Each link needs a label under 60 characters.");
+      if (!/^(\/(?!\/)[^\s]*|https:\/\/[^\s]+|mailto:[^\s]+)$/i.test(item.href ?? "")) {
+        throw new ValidationError(`"${item.label}" needs a link that starts with / or https://.`);
+      }
+    }
     await prisma.$transaction(async (tx) => {
       await tx.navigationItem.deleteMany({ where: { storeId: ctx.storeId, group } });
       if (items.length) {

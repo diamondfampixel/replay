@@ -162,7 +162,9 @@ export async function upsertCustomerAddress(ctx: ServiceContext, customerId: str
   };
 
   if (addressId) {
-    return prisma.address.update({ where: { id: addressId }, data });
+    const updated = await prisma.address.updateMany({ where: { id: addressId, customerId }, data });
+    if (updated.count === 0) throw new NotFoundError("Address");
+    return prisma.address.findFirstOrThrow({ where: { id: addressId, customerId } });
   }
   const count = await prisma.address.count({ where: { customerId } });
   return prisma.address.create({

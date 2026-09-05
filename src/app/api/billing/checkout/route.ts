@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
+import { rejectCrossOrigin } from "@/lib/request-origin";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiContext } from "@/lib/services/context";
 import { can } from "@/lib/permissions";
 import { getPlan, isPlanId } from "@/lib/plans";
-import { getStripe, introCouponId, isStripeBillingConfigured, priceLookupKey } from "@/lib/stripe";
+import { getStripe, introCouponId, isStripeBillingConfigured, isStripeTaxEnabled, priceLookupKey } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 
@@ -19,6 +20,8 @@ const bodySchema = z.object({
  * checkout changes nothing.
  */
 export async function POST(request: Request) {
+  const crossOrigin = rejectCrossOrigin(request);
+  if (crossOrigin) return crossOrigin;
   const ctx = await apiContext();
   if (!ctx) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   if (!can(ctx.role, "billing:manage")) {
@@ -66,6 +69,16 @@ export async function POST(request: Request) {
         ? [{ coupon: introCouponId(plan.id) }]
         : undefined,
     subscription_data: { metadata: { organizationId: org.id } },
+    // Halyard's own sales tax/VAT, calculated by Stripe Tax where a
+    // registration exists. Requires a billing address; an existing customer's
+    // address is refreshed from the session.
+    ...(isStripeTaxEnabled()
+      ? {
+          automatic_tax: { enabled: true },
+          billing_address_collection: "required" as const,
+          ...(org.stripeCustomerId ? { customer_update: { address: "auto" as const } } : {}),
+        }
+      : {}),
     success_url: `${appUrl}/admin/settings/billing?checkout=success`,
     cancel_url: `${appUrl}/admin/settings/billing?checkout=cancelled`,
   });

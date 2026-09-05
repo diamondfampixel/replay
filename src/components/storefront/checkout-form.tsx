@@ -71,7 +71,7 @@ export function CheckoutForm({
         toast.error(result.error);
         return;
       }
-      router.push(`${base}/orders/${result.data.orderId}`);
+      router.push(`${base}/orders/${result.data.orderId}?key=${encodeURIComponent(result.data.orderKey ?? "")}`);
     });
   }
 

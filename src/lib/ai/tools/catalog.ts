@@ -443,7 +443,7 @@ export const catalogTools = [
     capability: "catalog:write",
     async execute(input, ctx) {
       const count = await addProductsToCollection(ctx, input.collectionId, input.productIds);
-      const collection = await prisma.collection.findUniqueOrThrow({ where: { id: input.collectionId } });
+      const collection = await prisma.collection.findFirstOrThrow({ where: { id: input.collectionId, storeId: ctx.storeId } });
       return {
         summary: `Added ${count} product${count === 1 ? "" : "s"} to ${collection.title}.`,
         data: { count },

@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
+import { timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/db";
+import { getActiveContext } from "@/lib/session";
 import { getStore } from "@/lib/storefront/data";
 import { formatMoney, toNumber } from "@/lib/money";
 import { formatDate } from "@/lib/format";
@@ -11,10 +13,13 @@ export const metadata: Metadata = { title: "Order confirmation" };
 
 export default async function OrderConfirmationPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ storeSlug: string; id: string }>;
+  searchParams: Promise<{ key?: string }>;
 }) {
   const { storeSlug, id } = await params;
+  const { key } = await searchParams;
   const store = await getStore(storeSlug);
 
   const order = await prisma.order.findFirst({
@@ -22,6 +27,14 @@ export default async function OrderConfirmationPage({
     include: { items: true },
   });
   if (!order) notFound();
+
+  // The page shows the buyer's address and email, so an order id alone is not
+  // enough: the shopper's checkout key must match, or the viewer must be
+  // signed-in staff of this store.
+  const staff = await getActiveContext();
+  const isStaff = staff?.storeId === store.id;
+  const keyMatches = Boolean(order.accessToken && key && timingSafeEqual(Buffer.from(order.accessToken), Buffer.from(key.padEnd(order.accessToken.length).slice(0, order.accessToken.length))) && key === order.accessToken);
+  if (!isStaff && !keyMatches) notFound();
 
   const address = (order.shippingAddress ?? {}) as {
     name?: string; line1?: string; line2?: string | null;

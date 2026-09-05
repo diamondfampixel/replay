@@ -88,6 +88,9 @@ export async function signupAction(formData: FormData): Promise<ActionResult<{ r
   });
 }
 
+/** A real scrypt hash, verified when no account matches so timing cannot reveal which emails exist. */
+const DUMMY_HASH = hashPassword("halyard-dummy-password-for-timing");
+
 export async function loginAction(formData: FormData): Promise<ActionResult<{ redirect: string }>> {
   return guard(async () => {
     const meta = await requestMeta();
@@ -102,8 +105,15 @@ export async function loginAction(formData: FormData): Promise<ActionResult<{ re
     });
     if (!parsed.success) return fromZodError(parsed.error);
 
+    // A second window per account: one address cannot be stuffed from many IPs.
+    const accountLimit = await rateLimit(`login-account:${parsed.data.email.toLowerCase()}`, { limit: 10, windowMs: 15 * 60_000 });
+    if (!accountLimit.ok) {
+      return fail(`Too many sign-in attempts for this account. Try again in ${accountLimit.retryAfterSeconds}s.`);
+    }
+
     const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
-    const valid = user ? await verifyPassword(parsed.data.password, user.passwordHash) : false;
+    // Always run the hash so a missing account takes as long as a wrong password.
+    const valid = await verifyPassword(parsed.data.password, user?.passwordHash ?? (await DUMMY_HASH));
     if (!user || !valid) return fail("Incorrect email or password.");
 
     await createSession(user.id, meta);

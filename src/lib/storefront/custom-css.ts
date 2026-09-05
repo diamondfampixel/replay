@@ -37,6 +37,10 @@ export function sanitizeCustomCss(input: string | null | undefined): CustomCssRe
   // @charset/@namespace/@font-face with remote sources add nothing here.
   css = css.replace(/@(charset|namespace|font-face)[^{;]*(\{[^}]*\}|;)/gi, "");
 
+  // Comments go first: a brace hidden inside one must not be counted by the
+  // balancer below and then vanish, leaving a stray `}` that escapes the scope.
+  css = css.replace(/\/\*[\s\S]*?\*\//g, "");
+
   // Containment: a stray `}` would close the scoping block and let the rest of
   // the sheet run unscoped. Drop any closing brace that has no opener, and
   // close any that are left open, so the wrapper always holds.
@@ -48,7 +52,7 @@ export function sanitizeCustomCss(input: string | null | undefined): CustomCssRe
     balanced += ch;
   }
   if (depth > 0) { balanced += "}".repeat(depth); warnings.push("Unclosed block auto-closed."); }
-  css = balanced.replace(/\/\*[\s\S]*?\*\//g, (m) => (/[{}]/.test(m) ? "" : m));
+  css = balanced;
 
   // Scope: wrap in a nesting block. Selectors like `html`/`body` become
   // `.st-root html`, which matches nothing — the storefront root is the ceiling.

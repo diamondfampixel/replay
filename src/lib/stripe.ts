@@ -44,3 +44,14 @@ export function planFromLookupKey(
 export function introCouponId(planId: PlanId): string {
   return `halyard_intro_${planId}`;
 }
+
+/**
+ * Stripe Tax on Halyard's own sales (plans and themes). Off until
+ * STRIPE_TAX_ENABLED=true, which should only follow enabling Stripe Tax in the
+ * Stripe dashboard with an origin address and at least one registration —
+ * otherwise Stripe rejects the session. Calculation and collection only: Stripe
+ * Tax does not register, file or remit for us.
+ */
+export function isStripeTaxEnabled(): boolean {
+  return /^(1|true|yes)$/i.test(process.env.STRIPE_TAX_ENABLED?.trim() ?? "");
+}

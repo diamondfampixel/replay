@@ -272,7 +272,7 @@ export async function checkoutAction(storeSlug: string, payload: unknown, sessio
     }
 
     revalidatePath(`/s/${storeSlug}`, "layout");
-    return ok({ orderId: order.id, orderNumber: order.number });
+    return ok({ orderId: order.id, orderNumber: order.number, orderKey: order.accessToken });
   });
 }
 

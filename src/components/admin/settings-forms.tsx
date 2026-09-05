@@ -344,9 +344,12 @@ export function SettingsToggleForm({
               </Field>
             )}
             <div className="rounded-md border border-[#f0dfb8] bg-[#fdf6e7] px-3 py-2.5 text-[12.5px] text-[#7a4e07]">
-              <span className="font-medium">This is a single flat rate, not real tax calculation.</span>{" "}
-              It does not handle nexus, destination-based rates, product taxability or exemptions, and
-              it is not suitable for filing. Use a dedicated tax service before selling for real.
+              <span className="font-medium">This is a single flat rate that Halyard adds at checkout — it is not a tax calculation.</span>{" "}
+              It does not know where you are registered, what rate applies to a customer&apos;s address, whether a
+              product is taxable, or whether a customer is exempt. Halyard does not register you for tax, does not
+              file returns and does not remit tax anywhere. Automatic calculation through Stripe Tax is planned to
+              arrive with Stripe checkout for storefronts; until then, confirm your obligations with an accountant
+              before selling for real.
             </div>
           </CardContent>
         </Card>

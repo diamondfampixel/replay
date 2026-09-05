@@ -142,6 +142,18 @@ model AIUsageDay {
   @@unique([organizationId, day])
 }
 
+/// Idempotency ledger for inbound webhooks: the provider's event id is written
+/// before the event is applied, so a redelivered event is acknowledged and
+/// ignored instead of being applied twice.
+model WebhookEvent {
+  id         String   @id
+  provider   String
+  type       String
+  receivedAt DateTime @default(now())
+
+  @@index([provider, receivedAt])
+}
+
 /// One row per real AI request (a chat turn, a copy-variant generation, an
 /// onboarding build): the economics ledger. Safe metadata only — no prompt
 /// text, no tool inputs, no secrets — so it can be aggregated across
@@ -235,7 +247,13 @@ model Store {
   contactEmail String?
   supportPhone String?
   domain       String?
-  customDomain String?
+  // Merchant-owned hostname, lowercase, unique across the platform. Status:
+  // NOT_CONNECTED | DNS_REQUIRED | VERIFYING | CONNECTED | ERROR.
+  customDomain           String?   @unique
+  customDomainStatus     String    @default("NOT_CONNECTED")
+  customDomainVerifiedAt DateTime?
+  customDomainError      String?
+  customDomainCheckedAt  DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -625,6 +643,9 @@ model Order {
   customerId String?
 
   email String
+  // Random key handed to the shopper at checkout; the confirmation page needs
+  // it, so an order id alone (visible in logs and referrers) shows nothing.
+  accessToken String? @unique
 
   paymentStatus     PaymentStatus     @default(PENDING)
   fulfillmentStatus FulfillmentStatus @default(UNFULFILLED)

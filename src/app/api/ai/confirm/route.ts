@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rejectCrossOrigin } from "@/lib/request-origin";
 import { z } from "zod";
 import { apiContext, clientErrorMessage } from "@/lib/services/context";
 import { reportError } from "@/lib/monitoring";
@@ -13,6 +14,8 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const crossOrigin = rejectCrossOrigin(request);
+  if (crossOrigin) return crossOrigin;
   const ctx = await apiContext({ actor: "ai" });
   if (!ctx) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 

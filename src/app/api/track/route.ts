@@ -35,7 +35,9 @@ export async function POST(request: Request) {
   }
   const body = parsed.data;
 
-  const limit = await rateLimit(`track:${body.sessionId}`, { limit: 120, windowMs: 60_000 });
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  // Keyed by client address as well: a rotating session id must not lift the limit.
+  const limit = await rateLimit(`track:${ip}`, { limit: 240, windowMs: 60_000 });
   if (!limit.ok) return NextResponse.json({ ok: true, throttled: true });
 
   const store = await prisma.store.findUnique({

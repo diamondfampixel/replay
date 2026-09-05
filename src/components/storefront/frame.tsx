@@ -1,3 +1,5 @@
+import Script from "next/script";
+import { storefrontAnalyticsTag } from "@/lib/services/integrations";
 import { Suspense } from "react";
 import type { StorefrontStore } from "@/lib/storefront/data";
 import { getCartView } from "@/lib/services/cart";
@@ -15,6 +17,7 @@ import { googleFontsHref } from "@/lib/storefront/theme";
  * admin-only theme preview, which passes a store whose theme was swapped.
  */
 export async function StorefrontFrame({ store, children, banner }: { store: StorefrontStore; children: React.ReactNode; banner?: React.ReactNode }) {
+  const analytics = await storefrontAnalyticsTag(store.id).catch(() => null);
   const [cart, sessionId] = await Promise.all([getCartView(store.id), getStorefrontSessionId()]);
   const fontsHref = googleFontsHref(store.theme);
   const { theme } = store;
@@ -39,6 +42,14 @@ export async function StorefrontFrame({ store, children, banner }: { store: Stor
         </>
       )}
       {theme.customCss && <style dangerouslySetInnerHTML={{ __html: theme.customCss }} />}
+      {analytics && (
+        <>
+          <Script src={`https://www.googletagmanager.com/gtag/js?id=${analytics.measurementId}`} strategy="afterInteractive" />
+          <Script id="ga4-init" strategy="afterInteractive">
+            {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${analytics.measurementId}',{anonymize_ip:true});`}
+          </Script>
+        </>
+      )}
       <RevealObserver />
       <Suspense>
         <StorefrontAnalytics storeSlug={store.slug} sessionId={sessionId}>

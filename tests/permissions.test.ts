@@ -110,9 +110,9 @@ describe("integrations", () => {
     ).rejects.toThrow(/https/i);
 
     const result = await connectIntegration(ctx, "slack", {
-      webhookUrl: "https://hooks.slack.test/services/ABC/DEF",
+      webhookUrl: "https://hooks.slack.com/services/ABC/DEF",
     });
-    expect(result.label).toContain("hooks.slack.test");
+    expect(result.label).toContain("hooks.slack.com");
 
     const integrations = await listIntegrations(ctx);
     expect(integrations.find((integration) => integration.provider === "slack")?.status).toBe("CONNECTED");
@@ -120,7 +120,7 @@ describe("integrations", () => {
 
   it("never returns a stored secret to the caller", async () => {
     const secretPath = "/services/T00000/B11111/xxxxSECRETxxxx";
-    await connectIntegration(ctx, "discord", { webhookUrl: `https://discord.test${secretPath}` });
+    await connectIntegration(ctx, "discord", { webhookUrl: `https://discord.com/api/webhooks${secretPath}` });
 
     const integrations = await listIntegrations(ctx);
     const discord = integrations.find((integration) => integration.provider === "discord");

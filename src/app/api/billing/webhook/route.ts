@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { recordThemePurchase } from "@/lib/services/themes";
 import type Stripe from "stripe";
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { reportError } from "@/lib/monitoring";
 import { getStripe, isStripeBillingConfigured, planFromLookupKey } from "@/lib/stripe";
@@ -36,8 +37,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
+  // Stripe retries and can deliver an event more than once; the event id is
+  // recorded first so a replay is acknowledged without being applied twice.
+  try {
+    await prisma.webhookEvent.create({ data: { id: event.id, provider: "stripe", type: event.type } });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json({ received: true, duplicate: true });
+    }
+    throw error;
+  }
+
   try {
     switch (event.type) {
+      case "invoice.payment_failed": {
+        // A failed renewal: the plan stays until Stripe gives up (then
+        // subscription.updated/deleted arrive), but the account is flagged so
+        // the billing page can say so.
+        const invoice = event.data.object as Stripe.Invoice & { subscription?: string | { id: string } | null };
+        const subscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id ?? null;
+        if (subscriptionId) {
+          await prisma.organization.updateMany({
+            where: { stripeSubscriptionId: subscriptionId },
+            data: { planStatus: "PAST_DUE" },
+          });
+        }
+        break;
+      }
+
       case "checkout.session.completed": {
         const session = event.data.object;
         const organizationId = session.client_reference_id;

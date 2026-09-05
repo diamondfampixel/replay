@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
+import { rejectCrossOrigin } from "@/lib/request-origin";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { apiContext } from "@/lib/services/context";
 import { can } from "@/lib/permissions";
-import { getStripe, isStripeBillingConfigured } from "@/lib/stripe";
+import { getStripe, isStripeBillingConfigured, isStripeTaxEnabled } from "@/lib/stripe";
 import { getCatalogTheme, themePriceCents } from "@/lib/storefront/themes";
 import { isThemeEntitled } from "@/lib/services/themes";
 
@@ -17,6 +18,8 @@ const bodySchema = z.object({ themeId: z.string().max(60) });
  * checkout grants nothing. Prices come from the catalogue, never the client.
  */
 export async function POST(request: Request) {
+  const crossOrigin = rejectCrossOrigin(request);
+  if (crossOrigin) return crossOrigin;
   const ctx = await apiContext();
   if (!ctx) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   if (!can(ctx.role, "billing:manage")) {
@@ -48,6 +51,13 @@ export async function POST(request: Request) {
       },
     }],
     metadata: { kind: "theme", themeId: theme.id, organizationId: org.id },
+    ...(isStripeTaxEnabled()
+      ? {
+          automatic_tax: { enabled: true },
+          billing_address_collection: "required" as const,
+          ...(org.stripeCustomerId ? { customer_update: { address: "auto" as const } } : {}),
+        }
+      : {}),
     success_url: `${appUrl}/admin/store/themes?purchase=success&theme=${theme.id}`,
     cancel_url: `${appUrl}/admin/store/themes?purchase=cancelled`,
   });

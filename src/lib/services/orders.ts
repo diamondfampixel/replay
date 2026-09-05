@@ -4,6 +4,7 @@ import { round2, toNumber } from "@/lib/money";
 import { audit, authorize, NotFoundError, ValidationError, type ServiceContext } from "@/lib/services/context";
 import { orderListParamsSchema } from "@/lib/validation/commerce";
 import { decrementInventory } from "@/lib/services/products";
+import { generateToken } from "@/lib/auth";
 
 export type OrderListParams = import("zod").infer<typeof orderListParamsSchema>;
 
@@ -193,6 +194,7 @@ export async function createOrder(ctx: ServiceContext, input: CreateOrderInput) 
       data: {
         storeId: ctx.storeId,
         number,
+        accessToken: generateToken(18),
         customerId: input.customerId ?? null,
         email: input.email,
         paymentStatus: markPaid ? "PAID" : "PENDING",

@@ -361,11 +361,31 @@ export async function getExperiment(ctx: ServiceContext, id: string) {
 
   const [results, page, product] = await Promise.all([
     getExperimentResults(id),
-    experiment.pageId ? prisma.page.findUnique({ where: { id: experiment.pageId }, select: { id: true, title: true, slug: true, type: true } }) : null,
-    experiment.productId ? prisma.product.findUnique({ where: { id: experiment.productId }, select: { id: true, title: true, slug: true } }) : null,
+    experiment.pageId ? prisma.page.findFirst({ where: { id: experiment.pageId, storeId: ctx.storeId }, select: { id: true, title: true, slug: true, type: true } }) : null,
+    experiment.productId ? prisma.product.findFirst({ where: { id: experiment.productId, storeId: ctx.storeId }, select: { id: true, title: true, slug: true } }) : null,
   ]);
 
   return { ...experiment, results, page, product };
+}
+
+/**
+ * Every target id arrives from the client; each must resolve inside the
+ * caller's store, or an experiment could be aimed at another tenant's page,
+ * section or product and "winning" would overwrite it.
+ */
+async function assertTargetsBelongToStore(ctx: ServiceContext, input: Pick<ExperimentInput, "pageId" | "productId" | "sectionId">) {
+  if (input.pageId) {
+    const page = await prisma.page.findFirst({ where: { id: input.pageId, storeId: ctx.storeId }, select: { id: true } });
+    if (!page) throw new NotFoundError("Page");
+  }
+  if (input.productId) {
+    const product = await prisma.product.findFirst({ where: { id: input.productId, storeId: ctx.storeId }, select: { id: true } });
+    if (!product) throw new NotFoundError("Product");
+  }
+  if (input.sectionId) {
+    const section = await prisma.pageSection.findFirst({ where: { id: input.sectionId, page: { storeId: ctx.storeId } }, select: { id: true } });
+    if (!section) throw new NotFoundError("Section");
+  }
 }
 
 function validateVariants(variants: ExperimentInput["variants"]) {
@@ -387,6 +407,7 @@ export async function createExperiment(ctx: ServiceContext, input: ExperimentInp
   if (input.targetType === "product" && !input.productId) {
     throw new ValidationError("Choose the product this experiment runs on.");
   }
+  await assertTargetsBelongToStore(ctx, input);
 
   const experiment = await prisma.experiment.create({
     data: {
@@ -418,6 +439,7 @@ export async function createExperiment(ctx: ServiceContext, input: ExperimentInp
 
 export async function updateExperiment(ctx: ServiceContext, id: string, input: Partial<ExperimentInput>) {
   authorize(ctx, "experiments:write");
+  await assertTargetsBelongToStore(ctx, input);
   const existing = await prisma.experiment.findFirst({ where: { id, storeId: ctx.storeId } });
   if (!existing) throw new NotFoundError("Experiment");
 
@@ -539,7 +561,9 @@ export async function chooseWinner(ctx: ServiceContext, id: string, variantId: s
 
   if (apply && Object.keys(changes).length) {
     if (experiment.targetType === "page" && experiment.sectionId) {
-      const section = await prisma.pageSection.findUnique({ where: { id: experiment.sectionId } });
+      const section = await prisma.pageSection.findFirst({
+        where: { id: experiment.sectionId, page: { storeId: ctx.storeId } },
+      });
       if (section) {
         await prisma.pageSection.update({
           where: { id: section.id },
@@ -554,8 +578,8 @@ export async function chooseWinner(ctx: ServiceContext, id: string, variantId: s
       if (typeof changes.title === "string") data.title = changes.title;
       if (typeof changes.description === "string") data.description = changes.description;
       if (Object.keys(data).length) {
-        await prisma.product.update({ where: { id: experiment.productId }, data });
-        applied = true;
+        const updated = await prisma.product.updateMany({ where: { id: experiment.productId, storeId: ctx.storeId }, data });
+        applied = updated.count > 0;
       }
     }
   }

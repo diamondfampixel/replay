@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rejectCrossOrigin } from "@/lib/request-origin";
 import { z } from "zod";
 import type Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/db";
@@ -26,6 +27,8 @@ const bodySchema = z.object({
 /** Generates alternative copy for an A/B test. Writes nothing. */
 export async function POST(request: Request) {
   const startedAt = Date.now();
+  const crossOrigin = rejectCrossOrigin(request);
+  if (crossOrigin) return crossOrigin;
   const ctx = await apiContext();
   if (!ctx) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   if (!can(ctx.role, "experiments:write")) {

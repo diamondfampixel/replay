@@ -9,14 +9,19 @@ afterEach(() => {
 });
 
 describe("launch stage configuration", () => {
-  it("defaults to public and honours the env flag", () => {
+  it("defaults to the waitlist when unset, and opens only when public is set explicitly", () => {
+    // A deployment that forgets the variable must never open signup by accident.
+    expect(launchStage()).toBe("waitlist");
+    expect(signupIsOpen()).toBe(false);
+    expect(primaryCta()).toEqual({ label: "Join the waitlist", kind: "waitlist" });
+
+    process.env.LAUNCH_STAGE = "public";
     expect(launchStage()).toBe("public");
     expect(signupIsOpen()).toBe(true);
 
     process.env.LAUNCH_STAGE = "waitlist";
     expect(launchStage()).toBe("waitlist");
     expect(signupIsOpen()).toBe(false);
-    expect(primaryCta()).toEqual({ label: "Join the waitlist", kind: "waitlist" });
 
     process.env.LAUNCH_STAGE = "early-access";
     expect(primaryCta()).toEqual({ label: "Request early access", kind: "waitlist" });
