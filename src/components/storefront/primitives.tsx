@@ -26,6 +26,7 @@ export function Stars({ rating, size = 12 }: { rating: number; size?: number }) 
     <span
       className="inline-flex items-center gap-px leading-none"
       style={{ fontSize: size, color: "var(--st-warning, #a1660a)" }}
+      role="img"
       aria-label={`${rating.toFixed(1)} out of 5`}
     >
       {[1, 2, 3, 4, 5].map((n) => (

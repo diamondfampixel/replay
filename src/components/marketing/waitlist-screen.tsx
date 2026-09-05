@@ -64,7 +64,7 @@ export async function WaitlistScreen() {
               </li>
             ) : (
               <li key={social.id}>
-                <span className="wl-social-soon" aria-label={`${social.label} — coming soon`} title="Coming soon">
+                <span className="wl-social-soon" role="img" aria-label={`${social.label} — coming soon`} title="Coming soon">
                   <SocialIcon id={social.id} className="size-[18px]" />
                 </span>
               </li>

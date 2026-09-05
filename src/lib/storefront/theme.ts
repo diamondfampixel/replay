@@ -72,7 +72,9 @@ export const MOTION_LEVELS = ["off", "subtle", "balanced", "expressive"] as cons
 export const REVEAL_STYLES = ["none", "fade", "slide", "scale", "blur"] as const;
 export const HEADER_STYLES = ["classic", "centered", "split", "minimal", "transparent"] as const;
 export const FOOTER_STYLES = ["columns", "minimal", "centered", "brand"] as const;
-export const PRODUCT_LAYOUTS = ["mediaLeft", "gallery", "stacked", "stickyInfo", "minimal", "immersive"] as const;
+export const PRODUCT_LAYOUTS = ["mediaLeft", "gallery", "stacked", "stickyInfo", "minimal", "immersive", "editorial"] as const;
+/** Product page layouts that ship only with premium themes. */
+export const PREMIUM_PRODUCT_LAYOUTS = ["editorial"] as const;
 export const PRODUCT_BLOCKS = [
   "vendor", "title", "rating", "price", "variants", "quantityBuy", "inventory", "trust", "description", "details", "tags", "share",
 ] as const;
@@ -521,7 +523,10 @@ export function resolveTheme(input: { theme?: unknown; primaryColor: string; sec
   const surfaceAlt = rgbToHex(mix(bgRgb, inkRgb, isDark ? 0.08 : 0.05));
   const border = cr.border ?? rgbToHex(mix(bgRgb, inkRgb, isDark ? 0.18 : 0.14));
   const borderStrong = rgbToHex(mix(bgRgb, inkRgb, isDark ? 0.3 : 0.24));
-  const muted = cr.muted ?? ensureAA(mix(bgRgb, inkRgb, 0.62), hexToRgb(surfaceAlt), inkRgb);
+  // Muted text must stay readable at small sizes on every surface it lands on
+  // — including when a theme (or the assistant) sets it explicitly.
+  const mutedSeed = cr.muted ? hexToRgb(cr.muted) : mix(bgRgb, inkRgb, 0.62);
+  const muted = ensureAA(hexToRgb(ensureAA(mutedSeed, bgRgb, inkRgb)), hexToRgb(surfaceAlt), inkRgb);
   const accentInk = readableInk(accent);
   const contrastBg = isDark ? rgbToHex(mix(bgRgb, { r: 255, g: 255, b: 255 }, 0.92)) : rgbToHex(mix(inkRgb, { r: 0, g: 0, b: 0 }, 0.15));
   const contrastFg = readableInk(contrastBg);

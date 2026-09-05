@@ -1,3 +1,5 @@
+import { isPremiumSection } from "@/lib/storefront/sections";
+import { PREMIUM_PRODUCT_LAYOUTS } from "@/lib/storefront/theme";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanupTestStore, createTestStore, testDb } from "./helpers";
 import { ensureHomepage } from "@/lib/services/provision";
@@ -54,6 +56,37 @@ describe("theme catalogue", () => {
     // At least eight different display faces and six different hero compositions are in play.
     expect(new Set(THEME_CATALOG.map((t) => resolveTheme({ theme: t.theme, primaryColor: "#111" }).fontDisplay)).size).toBeGreaterThanOrEqual(8);
     expect(new Set(THEME_CATALOG.map((t) => t.recipe.find((s) => s.type === "hero")?.layout ?? t.recipe[0].type)).size).toBeGreaterThanOrEqual(6);
+  });
+
+  it("every premium theme is structurally out of reach of an included one", () => {
+    const included = THEME_CATALOG.filter((t) => t.tier === "included");
+    const premium = THEME_CATALOG.filter((t) => t.tier !== "included");
+    for (const t of premium) {
+      const premiumSections = t.recipe.filter((slot) => isPremiumSection(slot.type));
+      expect(premiumSections.length, `${t.id} must use at least one premium-only section`).toBeGreaterThanOrEqual(1);
+    }
+    for (const t of included) {
+      expect(t.recipe.some((slot) => isPremiumSection(slot.type)), `${t.id} must not use premium-only sections`).toBe(false);
+      expect((PREMIUM_PRODUCT_LAYOUTS as readonly string[]).includes(t.theme.product?.layout ?? ""), `${t.id} must not use a premium product layout`).toBe(false);
+    }
+    // The "change a few settings" test: no included recipe's section/layout sequence equals any premium one.
+    const signature = (t: (typeof THEME_CATALOG)[number]) => t.recipe.map((slot) => `${slot.type}/${slot.layout ?? ""}`).join(">");
+    for (const p of premium) for (const i of included) expect(signature(p), `${p.id} vs ${i.id}`).not.toBe(signature(i));
+  });
+
+  it("a premium lookbook is seeded from the merchant's own product photos, never invented ones", async () => {
+    const { renderThemeForStore } = await import("@/lib/services/themes");
+    const { getCatalogTheme } = await import("@/lib/storefront/themes");
+    const { createProduct } = await import("@/lib/services/products");
+    const own = await createTestStore("themes-lookbook");
+    const product = await createProduct(own.ctx, { title: "Lookbook Tee", price: 30, status: "ACTIVE" });
+    await testDb.productImage.create({ data: { productId: product.id, url: "/uploads/test/lookbook-tee.png", alt: "Tee on a rail", position: 0 } });
+    const { sections } = await renderThemeForStore(own.ctx.storeId, getCatalogTheme("maison")!);
+    await cleanupTestStore(own.organization.id, own.user.id);
+    const lookbook = sections.find((s) => s.type === "lookbook");
+    expect(lookbook).toBeTruthy();
+    const items = (lookbook!.config.items as Array<{ media: { url: string }; productSlug: string; caption: string }>);
+    expect(items.some((i) => i.media.url === "/uploads/test/lookbook-tee.png" && i.productSlug === product.slug && i.caption === "Lookbook Tee")).toBe(true);
   });
 
   it("premium themes carry more than a recolour: custom schemes or a richer composition", () => {

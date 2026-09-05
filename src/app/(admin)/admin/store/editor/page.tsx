@@ -1,3 +1,4 @@
+import { hasPremiumDesign } from "@/lib/storefront/premium";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
@@ -27,7 +28,7 @@ export default async function StoreEditorPage({
     : await prisma.page.findFirst({ where: { storeId: ctx.storeId, type: "HOME" } });
   if (!page) notFound();
 
-  const [editable, store, collections, products, aiConfigured, snapshots] = await Promise.all([
+  const [editable, store, collections, products, aiConfigured, snapshots, premiumUnlocked] = await Promise.all([
     getEditablePage(ctx, page.id),
     prisma.store.findUniqueOrThrow({ where: { id: ctx.storeId }, select: { slug: true, theme: true, primaryColor: true, secondaryColor: true } }),
     prisma.collection.findMany({
@@ -43,6 +44,7 @@ export default async function StoreEditorPage({
     }),
     isAIConfigured(ctx.storeId),
     listDesignSnapshots(ctx),
+    hasPremiumDesign(ctx.organizationId, ctx.storeId),
   ]);
   const theme = resolveTheme({ theme: store.theme, primaryColor: store.primaryColor, secondaryColor: store.secondaryColor });
 
@@ -60,6 +62,7 @@ export default async function StoreEditorPage({
         canWrite={can(auth.role, "storefront:write")}
         theme={{ dna: theme.dna, direction: theme.direction, motion: theme.motion, cards: theme.cards, schemes: theme.schemes.map((s) => ({ id: s.id, name: s.name })) }}
         snapshots={snapshots.map((s) => ({ ...s, createdAt: s.createdAt.toISOString() }))}
+        premiumUnlocked={premiumUnlocked}
       />
     </div>
   );

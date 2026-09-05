@@ -1,3 +1,4 @@
+import { hasPremiumDesign } from "@/lib/storefront/premium";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { requireCapability } from "@/lib/session";
@@ -23,6 +24,7 @@ export default async function DesignSettingsPage() {
       secondaryColor={store.secondaryColor}
       storeSlug={store.slug}
       canWrite={can(ctx.role, "settings:write")}
+      premiumUnlocked={await hasPremiumDesign(ctx.organizationId, ctx.storeId)}
     />
   );
 }

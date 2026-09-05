@@ -5,6 +5,7 @@ import { CollectionGrid, CollectionHero, FeaturedProduct, FeaturedProducts } fro
 import { Benefits, Faq, FullImage, Gallery, ImageText, Text } from "@/components/storefront/sections/content";
 import { LogoList, Quote, Reviews, Stats, Story, Testimonials } from "@/components/storefront/sections/proof";
 import { CustomBanner, Newsletter, ValueProps } from "@/components/storefront/sections/conversion";
+import { DropCountdown, Lookbook, SpecSheet } from "@/components/storefront/sections/premium";
 
 export type RenderedSection = {
   id: string;
@@ -63,6 +64,9 @@ export async function SectionRenderer({
     case "newsletter": return <Newsletter c={c as SectionConfig<"newsletter">} ctx={ctx} />;
     case "customBanner": return <CustomBanner c={c as SectionConfig<"customBanner">} ctx={ctx} />;
     case "valueProps": return <ValueProps c={c as SectionConfig<"valueProps">} ctx={ctx} />;
+    case "lookbook": return <Lookbook c={c as SectionConfig<"lookbook">} ctx={ctx} />;
+    case "specSheet": return <SpecSheet c={c as SectionConfig<"specSheet">} ctx={ctx} />;
+    case "dropCountdown": return <DropCountdown c={c as SectionConfig<"dropCountdown">} ctx={ctx} />;
     default: return null;
   }
 }

@@ -316,7 +316,27 @@ export function ProductDetail(props: ProductProps) {
       <div className="mx-auto px-5 py-8 sm:px-7" style={container}>
         {!immersive && breadcrumb}
 
-        {layout === "stacked" ? (
+        {layout === "editorial" ? (
+          /* Premium: a magazine spread — the first image full-bleed across the
+             page, the rest as a two-up sequence, the buy box pinned on the right. */
+          <div className="grid gap-8 lg:grid-cols-[1fr_380px] lg:gap-14">
+            <div className="space-y-4">
+              {product.images[0] && (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={product.images[0].url} alt={product.images[0].alt} className="st-radius-image w-full object-cover" style={{ aspectRatio: "4 / 5" }} />
+              )}
+              {product.images.length > 1 && (
+                <div className="grid grid-cols-2 st-grid-gap">
+                  {product.images.slice(1).map((image, i) => (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img key={`${image.url}-${i}`} src={image.url} alt={image.alt} className={cn("st-radius-image w-full object-cover", i % 3 === 2 && "col-span-2")} style={{ aspectRatio: i % 3 === 2 ? "16 / 9" : "4 / 5" }} loading="lazy" />
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="lg:sticky lg:top-24 lg:self-start">{info}</div>
+          </div>
+        ) : layout === "stacked" ? (
           <div className="grid gap-10">
             <div className="mx-auto w-full max-w-3xl">{gallery("hero")}</div>
             <div className="mx-auto w-full max-w-xl">{info}</div>

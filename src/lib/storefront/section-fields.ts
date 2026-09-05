@@ -153,6 +153,36 @@ export const SECTION_FIELDS: Record<SectionType, FieldSpec[]> = {
     { key: "role", label: "Role or location", type: "text" },
     mediaField("Portrait (editorial layout)"),
   ],
+  lookbook: [
+    heading,
+    { key: "intro", label: "Intro", type: "textarea", rows: 2 },
+    { key: "items", label: "Looks", type: "items", itemLabel: "Look", max: 10, fields: [
+      { key: "media", label: "Image", type: "media" },
+      { key: "caption", label: "Caption", type: "text" },
+      { key: "productSlug", label: "Product slug (shop the look)", type: "text", hint: "The last part of the product URL, e.g. wool-beanie" },
+      { key: "size", label: "Size", type: "select", options: [{ value: "large", label: "Large" }, { value: "medium", label: "Medium" }, { value: "small", label: "Small" }] },
+    ] },
+  ],
+  specSheet: [
+    heading,
+    { key: "intro", label: "Intro", type: "textarea", rows: 2 },
+    { key: "rows", label: "Rows", type: "items", itemLabel: "Row", max: 12, fields: [
+      { key: "label", label: "Label", type: "text" },
+      { key: "value", label: "Value", type: "text", hint: "For the compare layout, separate columns with |" },
+      { key: "detail", label: "Detail", type: "textarea", rows: 2 },
+    ] },
+    { key: "columns", label: "Compare columns", type: "items", itemLabel: "Column", max: 3, group: "layout", fields: [{ key: "", label: "Name", type: "text" }], showIf: (c) => c.layout === "compare" },
+  ],
+  dropCountdown: [
+    { key: "eyebrow", label: "Eyebrow", type: "text" },
+    { key: "headline", label: "Headline", type: "text" },
+    { key: "body", label: "Body", type: "textarea", rows: 2 },
+    { key: "endsAt", label: "Drop date & time", type: "text", hint: "ISO format, e.g. 2026-10-01T16:00:00Z. Leave empty for \"to be announced\"." },
+    { key: "ctaLabel", label: "Button label", type: "text" },
+    { key: "ctaHref", label: "Button link", type: "url", hint: "Leave empty to show only the notify-me form" },
+    { key: "showNewsletter", label: "Show notify-me form", type: "boolean" },
+    { key: "media", label: "Poster image", type: "media", showIf: (c) => c.layout === "poster" },
+  ],
   story: [
     heading,
     { key: "items", label: "Chapters", type: "items", itemLabel: "Chapter", max: 8, fields: [{ key: "title", label: "Title", type: "text" }, { key: "body", label: "Body", type: "textarea", rows: 3 }, { key: "media", label: "Image", type: "media" }] },

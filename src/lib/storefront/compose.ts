@@ -29,7 +29,11 @@ export type ComposeBrief = {
     quote?: { quote: string; author?: string; role?: string };
     announcement?: string;
   };
-  catalog: { productCount: number; collectionSlugs: string[]; featuredProductId?: string | null; hasReviews: boolean };
+  catalog: {
+    productCount: number; collectionSlugs: string[]; featuredProductId?: string | null; hasReviews: boolean;
+    /** The merchant's own product imagery, for sections that are art-directed around photographs. */
+    looks?: Array<{ url: string; alt: string; title: string; slug: string }>;
+  };
   /** Restrict/extend to these section types (onboarding checkboxes). */
   wanted?: string[];
 };
@@ -136,6 +140,22 @@ const BUILDER: Partial<Record<SectionType, (b: ComposeBrief, t: ThemeLike) => Re
   announcement: ANNOUNCE("static", "ink").patch, text: STATEMENT.patch, featuredProduct: FEATURED_PRODUCT("split").patch, story: STORY.patch,
   productGrid: (b) => ({ heading: b.goal === "launch" ? "Everything" : "All products", limit: Math.min(12, Math.max(3, b.catalog.productCount || 8)) }),
   testimonials: () => ({ items: [] }), gallery: () => ({ items: [] }), fullImage: () => ({}), logoList: () => ({ items: [] }),
+  // Premium sections: recipes place them; merchants fill the imagery. Copy is
+  // seeded from the brief where it can be, never invented.
+  lookbook: (b) => ({
+    heading: b.goal === "story" ? "The lookbook" : "The collection",
+    items: (b.catalog.looks ?? []).slice(0, 6).map((look, i) => ({
+      media: { url: look.url, alt: look.alt || look.title, focalX: 50, focalY: 50 },
+      caption: look.title,
+      productSlug: look.slug,
+      size: i % 3 === 0 ? "large" : i % 3 === 1 ? "medium" : "small",
+    })),
+  }),
+  specSheet: (b) => ({
+    heading: "The details",
+    rows: (b.facts?.benefits ?? []).slice(0, 6).map((x) => ({ label: x.title, value: x.body ?? "", detail: "" })),
+  }),
+  dropCountdown: (b) => ({ eyebrow: b.goal === "launch" ? "Launching" : "Next drop", headline: b.goal === "launch" ? `${b.name} is almost here` : "The next drop is coming", endsAt: "" }),
   imageHero: (b) => ({ headline: short(b.tagline, 90) || b.name, subheadline: short(b.description, 150) }),
   videoHero: (b) => ({ headline: short(b.tagline, 90) || b.name, subheadline: short(b.description, 150) }),
   collectionHero: (b) => (b.catalog.collectionSlugs[0] ? { collectionSlug: b.catalog.collectionSlugs[0] } : null),

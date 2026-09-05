@@ -1,3 +1,4 @@
+import { hasPremiumDesign } from "@/lib/storefront/premium";
 import { z } from "zod";
 import { prisma, type Prisma } from "@/lib/db";
 import { defineTool } from "@/lib/ai/types";
@@ -7,7 +8,7 @@ import { getEditablePage, saveDraftSections } from "@/lib/services/pages";
 import { applyStoreTheme, getStoreTheme } from "@/lib/storefront/design";
 import { DESIGN_DIRECTIONS, DIRECTION_PRESETS, resolveTheme, themeWarnings } from "@/lib/storefront/theme";
 import { DNA_AXES, DNA_MOVES, applyDnaMove, describeDna, dnaOverrideSchema, type DesignDNA } from "@/lib/storefront/dna";
-import { SECTION_META, SECTION_TYPES, designSchema, normaliseSectionConfig, summariseSection, type SectionType } from "@/lib/storefront/sections";
+import { SECTION_META, SECTION_TYPES, designSchema, normaliseSectionConfig, summariseSection, type SectionType, isPremiumSection } from "@/lib/storefront/sections";
 import { describeSectionFields } from "@/lib/storefront/section-fields";
 import { composeHomepage, describeComposition, type ComposeBrief } from "@/lib/storefront/compose";
 
@@ -210,7 +211,7 @@ export const designTools = [
     risk: "high",
     capability: "storefront:write",
     async confirm(input, ctx) {
-      const { sections } = await plan(ctx.storeId, input);
+      const { sections } = await plan(ctx.storeId, await withoutLockedSections(input, ctx));
       return {
         title: "Compose a new homepage draft?",
         description: "The current homepage is snapshotted, then this composition is staged as a draft for review in the store editor. Nothing goes live until you publish.",
@@ -221,7 +222,7 @@ export const designTools = [
     async execute(input, ctx) {
       const page = await findPage(ctx.storeId, input.page);
       const snapshot = await createDesignSnapshot(ctx, { label: "Before AI composition", source: "ai" });
-      const { sections, theme } = await plan(ctx.storeId, input);
+      const { sections, theme } = await plan(ctx.storeId, await withoutLockedSections(input, ctx));
       const existing = await getEditablePage(ctx, page.id);
       // Keep stable ids for sections of the same type at the same slot so the
       // editor's selection survives, otherwise mint draft ids.
@@ -280,19 +281,34 @@ function preview(current: DesignDNA, input: { moves?: Array<{ move: keyof typeof
   return next;
 }
 
+/** Premium-only section types drop out of a composition request unless the store holds a premium theme. */
+async function withoutLockedSections<T extends { sections?: string[] }>(input: T, ctx: { organizationId: string; storeId: string }): Promise<T> {
+  if (!input.sections?.some((t) => isPremiumSection(t))) return input;
+  if (await hasPremiumDesign(ctx.organizationId, ctx.storeId)) return input;
+  return { ...input, sections: input.sections.filter((t) => !isPremiumSection(t)) };
+}
+
 async function plan(storeId: string, input: { goal: "launch" | "catalog" | "story" | "conversion"; tagline?: string; emphasis?: string; sections?: SectionType[]; facts?: ComposeBrief["facts"] }) {
-  const [store, theme, productCount, collections, reviewCount, newest] = await Promise.all([
+  const [store, theme, productCount, collections, reviewCount, newest, withImages] = await Promise.all([
     prisma.store.findUniqueOrThrow({ where: { id: storeId }, select: { name: true, description: true, industry: true } }),
     resolvedFor(storeId),
     prisma.product.count({ where: { storeId, status: "ACTIVE" } }),
     prisma.collection.findMany({ where: { storeId, visible: true }, select: { slug: true }, orderBy: { position: "asc" }, take: 6 }),
     prisma.review.count({ where: { storeId, status: "PUBLISHED" } }),
     prisma.product.findFirst({ where: { storeId, status: "ACTIVE" }, orderBy: { createdAt: "desc" }, select: { id: true } }),
+    prisma.product.findMany({
+      where: { storeId, status: "ACTIVE", images: { some: {} } },
+      select: { title: true, slug: true, images: { orderBy: { position: "asc" }, take: 1, select: { url: true, alt: true } } },
+      orderBy: { createdAt: "desc" }, take: 6,
+    }),
   ]);
   const brief: ComposeBrief = {
     name: store.name, description: store.description, industry: store.industry, tagline: input.tagline, goal: input.goal, emphasis: input.emphasis,
     facts: input.facts,
-    catalog: { productCount, collectionSlugs: collections.map((c) => c.slug), featuredProductId: newest?.id ?? null, hasReviews: reviewCount > 0 },
+    catalog: {
+      productCount, collectionSlugs: collections.map((c) => c.slug), featuredProductId: newest?.id ?? null, hasReviews: reviewCount > 0,
+      looks: withImages.map((p) => ({ url: p.images[0].url, alt: p.images[0].alt ?? "", title: p.title, slug: p.slug })),
+    },
     wanted: input.sections,
   };
   return { sections: composeHomepage(theme, brief), theme, brief };

@@ -62,8 +62,10 @@ function useHistory<T>(initial: T) {
 }
 
 export function StoreEditor({
-  pageId, pageTitle, storeSlug, initialSections, hasUnpublishedChanges, collections, products, aiConfigured, canWrite, theme, snapshots: initialSnapshots,
+  pageId, pageTitle, storeSlug, initialSections, hasUnpublishedChanges, collections, products, aiConfigured, canWrite, theme, snapshots: initialSnapshots, premiumUnlocked = false,
 }: {
+  /** Premium-only sections may be added (the store has a premium theme). */
+  premiumUnlocked?: boolean;
   pageId: string;
   pageTitle: string;
   storeSlug: string;
@@ -376,7 +378,7 @@ export function StoreEditor({
         </aside>
       </div>
 
-      <AddSectionDialog open={addOpen} onOpenChange={setAddOpen} onPick={addSection} />
+      <AddSectionDialog open={addOpen} onOpenChange={setAddOpen} onPick={addSection}  premiumUnlocked={premiumUnlocked} />
 
       <GenerateDialog open={generateOpen} onOpenChange={setGenerateOpen} onGenerated={() => { setGenerateOpen(false); router.refresh(); }} />
 
@@ -442,7 +444,7 @@ function ToolbarButton({ label, onClick, disabled, danger, children }: { label: 
   );
 }
 
-function AddSectionDialog({ open, onOpenChange, onPick }: { open: boolean; onOpenChange: (open: boolean) => void; onPick: (type: SectionType) => void }) {
+function AddSectionDialog({ open, onOpenChange, onPick, premiumUnlocked }: { open: boolean; onOpenChange: (open: boolean) => void; onPick: (type: SectionType) => void; premiumUnlocked: boolean }) {
   const [query, setQuery] = React.useState("");
   const [category, setCategory] = React.useState<string>("all");
   const q = query.trim().toLowerCase();
@@ -478,11 +480,26 @@ function AddSectionDialog({ open, onOpenChange, onPick }: { open: boolean; onOpe
           <div className="scroll-thin grid max-h-[55vh] gap-2 overflow-y-auto sm:grid-cols-2">
             {list.map((type) => {
               const meta = SECTION_META[type];
+              const locked = Boolean(meta.premium) && !premiumUnlocked;
               return (
-                <button key={type} type="button" onClick={() => onPick(type)} className="rounded-md border border-ink-200 px-3 py-2.5 text-left transition-colors hover:border-ink-400 hover:bg-ink-50">
-                  <p className="text-[13px] font-medium text-ink-900">{meta.label}</p>
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => { if (!locked) onPick(type); }}
+                  aria-disabled={locked || undefined}
+                  title={locked ? "Included with any premium theme" : undefined}
+                  className={cn("rounded-md border px-3 py-2.5 text-left transition-colors", locked ? "cursor-not-allowed border-dashed border-ink-200 bg-ink-50/60" : "border-ink-200 hover:border-ink-400 hover:bg-ink-50")}
+                >
+                  <p className="flex items-center gap-2 text-[13px] font-medium text-ink-900">
+                    {meta.label}
+                    {meta.premium && <span className="rounded-full bg-ink-900 px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-wider text-white">Premium</span>}
+                  </p>
                   <p className="mt-0.5 text-[12px] text-ink-500">{meta.description}</p>
-                  {meta.layouts && <p className="mt-1 text-[11px] text-ink-400">{meta.layouts.length} compositions</p>}
+                  {locked ? (
+                    <p className="mt-1 text-[11px] text-ink-400">Comes with any premium theme from the Themes gallery.</p>
+                  ) : (
+                    meta.layouts && <p className="mt-1 text-[11px] text-ink-400">{meta.layouts.length} compositions</p>
+                  )}
                 </button>
               );
             })}

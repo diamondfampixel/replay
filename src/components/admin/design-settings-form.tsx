@@ -13,7 +13,7 @@ import { updateDesignSettingsAction } from "@/app/actions/settings";
 import {
   BUTTON_HOVERS, BUTTON_SHAPES, BUTTON_SIZES, BUTTON_STYLES, CARD_HOVERS, CARD_STYLES, COLLECTION_HEROES, DENSITIES, DESIGN_DIRECTIONS,
   DIRECTION_PRESETS, FONTS, FONT_KEYS, FOOTER_STYLES, GRID_GAPS, HEADER_STYLES, IMAGE_RATIOS, MOTION_LEVELS, NEUTRAL_TEMPS, PAGE_WIDTHS,
-  PRODUCT_BLOCKS, PRODUCT_LAYOUTS, RADII, REVEAL_STYLES, SECTION_SPACINGS, SHADOWS, SOCIAL_KEYS, resolveTheme, themeWarnings,
+  PREMIUM_PRODUCT_LAYOUTS, PRODUCT_BLOCKS, PRODUCT_LAYOUTS, RADII, REVEAL_STYLES, SECTION_SPACINGS, SHADOWS, SOCIAL_KEYS, resolveTheme, themeWarnings,
   type DesignDirection, type StoreTheme,
 } from "@/lib/storefront/theme";
 import { DNA_AXES, DNA_MOVES, applyDnaMove, describeDna, type DesignDNA, type DnaAxis } from "@/lib/storefront/dna";
@@ -28,8 +28,10 @@ type Group = "colors" | "typography" | "layout" | "shape" | "surface" | "buttons
  * writes — nothing here is CSS except the scoped escape hatch at the end.
  */
 export function DesignSettingsForm({
-  initial, primaryColor, secondaryColor, storeSlug, canWrite,
+  initial, primaryColor, secondaryColor, storeSlug, canWrite, premiumUnlocked = false,
 }: {
+  /** Premium-only layouts are selectable (the store has a premium theme). */
+  premiumUnlocked?: boolean;
   initial: StoreTheme;
   primaryColor: string;
   secondaryColor: string;
@@ -301,7 +303,8 @@ export function DesignSettingsForm({
             <Card>
               <CardHeader><CardTitle>Product page</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                <Choice label="Layout" options={PRODUCT_LAYOUTS} value={theme.product?.layout ?? resolved.product.layout} onChange={(v) => group("product", { layout: v })} disabled={disabled} labels={{ mediaLeft: "media left", stickyInfo: "sticky info" }} />
+                <Choice label="Layout" options={PRODUCT_LAYOUTS.filter((l) => premiumUnlocked || !(PREMIUM_PRODUCT_LAYOUTS as readonly string[]).includes(l) || (theme.product?.layout ?? resolved.product.layout) === l)} value={theme.product?.layout ?? resolved.product.layout} onChange={(v) => group("product", { layout: v })} disabled={disabled} labels={{ mediaLeft: "media left", stickyInfo: "sticky info", editorial: "editorial (premium)" }} />
+                {!premiumUnlocked && <p className="mt-1 text-[11.5px] text-ink-400">The editorial product page comes with any premium theme.</p>}
                 <Choice label="Image shape" options={IMAGE_RATIOS} value={theme.product?.imageRatio ?? resolved.product.imageRatio} onChange={(v) => group("product", { imageRatio: v })} disabled={disabled} />
                 <BlockOrder value={theme.product?.blocks ?? resolved.product.blocks} onChange={(v) => group("product", { blocks: v })} disabled={disabled} />
                 <Toggle label="Show reviews" checked={theme.product?.showReviews ?? true} onChange={(v) => group("product", { showReviews: v })} disabled={disabled} />

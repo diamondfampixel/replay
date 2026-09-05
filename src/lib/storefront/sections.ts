@@ -68,8 +68,20 @@ export const SECTION_TYPES = [
   "text", "imageText", "gallery", "fullImage", "stats", "logoList", "quote", "story", "benefits", "testimonials", "reviews", "faq",
   // conversion
   "newsletter", "customBanner", "valueProps",
+  // premium — only available with a premium theme (see PREMIUM_SECTION_TYPES)
+  "lookbook", "specSheet", "dropCountdown",
 ] as const;
 export type SectionType = (typeof SECTION_TYPES)[number];
+
+/**
+ * Sections that ship only with premium themes. They are what makes a paid
+ * theme structurally different from an included one: an included theme can be
+ * recoloured and recomposed, but it cannot reach these.
+ */
+export const PREMIUM_SECTION_TYPES = ["lookbook", "specSheet", "dropCountdown"] as const satisfies readonly SectionType[];
+export function isPremiumSection(type: string): boolean {
+  return (PREMIUM_SECTION_TYPES as readonly string[]).includes(type);
+}
 
 const base = { design: designSchema.default(() => designSchema.parse({})) };
 
@@ -244,6 +256,47 @@ export const sectionSchemas = {
     ...base,
   }),
 
+  lookbook: z.object({
+    layout: z.enum(["editorial", "filmstrip", "stacked"]).default("editorial"),
+    heading: z.string().max(120).default(""),
+    intro: z.string().max(300).default(""),
+    items: z.array(z.object({
+      media: mediaSchema.default(() => mediaSchema.parse({})),
+      caption: z.string().max(140).default(""),
+      productSlug: z.string().max(120).default(""),
+      size: z.enum(["large", "medium", "small"]).default("large"),
+    })).max(10).default([]),
+    ...base,
+  }),
+
+  specSheet: z.object({
+    layout: z.enum(["table", "cards", "compare"]).default("table"),
+    heading: z.string().max(120).default(""),
+    intro: z.string().max(300).default(""),
+    rows: z.array(z.object({
+      label: z.string().max(60),
+      value: z.string().max(160).default(""),
+      detail: z.string().max(240).default(""),
+    })).max(12).default([]),
+    /** Column headings for the compare layout; row values are split on "|". */
+    columns: z.array(z.string().max(40)).max(3).default([]),
+    ...base,
+  }),
+
+  dropCountdown: z.object({
+    layout: z.enum(["banner", "poster"]).default("banner"),
+    eyebrow: z.string().max(60).default("Next drop"),
+    headline: z.string().max(140).default("The next drop is coming"),
+    body: z.string().max(280).default(""),
+    /** ISO date-time; empty means "no date yet". */
+    endsAt: z.string().max(40).default(""),
+    ctaLabel: z.string().max(40).default("Get notified"),
+    ctaHref: z.string().max(200).default(""),
+    showNewsletter: z.boolean().default(true),
+    media: mediaSchema.default(() => mediaSchema.parse({})),
+    ...base,
+  }),
+
   stats: z.object({
     layout: z.enum(["row", "grid", "inline"]).default("row"),
     heading: z.string().max(120).default(""),
@@ -363,6 +416,8 @@ export type SectionMeta = {
   blockLabel?: string;
   /** The `layout` values that fill their own data and shouldn't be hidden when empty in preview. */
   keywords?: string;
+  /** Only available with a premium theme. */
+  premium?: boolean;
 };
 
 export const SECTION_META: Record<SectionType, SectionMeta> = {
@@ -404,6 +459,12 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
   reviews: { label: "Reviews", description: "Pulls real published product reviews.", category: "brand", layouts: [{ id: "grid", label: "Grid" }, { id: "list", label: "List" }] },
   faq: { label: "FAQ", description: "Expandable question and answer list.", category: "content", blocksKey: "items", blockLabel: "Question",
     layouts: [{ id: "accordion", label: "Accordion" }, { id: "twoColumn", label: "Two columns" }] },
+  lookbook: { label: "Lookbook", description: "Editorial image sequence with captions and shop-the-look links — art direction, not a grid.", category: "brand", blocksKey: "items", blockLabel: "Look", premium: true,
+    layouts: [{ id: "editorial", label: "Editorial (mixed sizes)" }, { id: "filmstrip", label: "Filmstrip (scrolls)" }, { id: "stacked", label: "Stacked full-width" }], keywords: "campaign editorial gallery shop the look" },
+  specSheet: { label: "Spec sheet", description: "Structured details — materials, ingredients, dimensions, or a side-by-side comparison.", category: "content", blocksKey: "rows", blockLabel: "Row", premium: true,
+    layouts: [{ id: "table", label: "Table" }, { id: "cards", label: "Cards" }, { id: "compare", label: "Compare columns" }], keywords: "ingredients materials specifications compare details" },
+  dropCountdown: { label: "Drop countdown", description: "A timed launch with a live countdown and notify-me capture.", category: "conversion", premium: true,
+    layouts: [{ id: "banner", label: "Banner" }, { id: "poster", label: "Poster (image)" }], keywords: "launch timer countdown release" },
   newsletter: { label: "Newsletter", description: "Email capture that creates real subscribers.", category: "conversion",
     layouts: [{ id: "centered", label: "Centered" }, { id: "inline", label: "Inline" }, { id: "split", label: "Split with image" }, { id: "banner", label: "Banner" }] },
   customBanner: { label: "Banner / CTA", description: "A promotional strip, card or poster with a call to action.", category: "conversion",
@@ -511,7 +572,7 @@ export function sectionDefaultsFor(type: SectionType, theme: Pick<ResolvedTheme,
 export function summariseSection(type: string, config: Record<string, unknown>): string {
   const value = (key: string) => (typeof config[key] === "string" ? (config[key] as string) : "");
   switch (type) {
-    case "hero": case "imageHero": case "videoHero": case "collectionHero":
+    case "hero": case "imageHero": case "videoHero": case "collectionHero": case "dropCountdown":
       return value("headline") || "No headline";
     case "announcement": return value("text");
     case "marquee": return (Array.isArray(config.items) ? (config.items as Array<{ text: string }>).map((i) => i.text).join(" · ") : "") || "Scrolling text";

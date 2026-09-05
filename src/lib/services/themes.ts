@@ -34,16 +34,24 @@ export async function isThemeEntitled(organizationId: string, theme: CatalogThem
 
 /** The brief a theme is rendered with: the merchant's own store, never invented facts. */
 async function briefFor(storeId: string): Promise<ComposeBrief> {
-  const [store, productCount, collections, reviewCount, newest] = await Promise.all([
+  const [store, productCount, collections, reviewCount, newest, withImages] = await Promise.all([
     prisma.store.findUniqueOrThrow({ where: { id: storeId }, select: { name: true, description: true, industry: true } }),
     prisma.product.count({ where: { storeId, status: "ACTIVE" } }),
     prisma.collection.findMany({ where: { storeId, visible: true }, select: { slug: true }, orderBy: { position: "asc" }, take: 6 }),
     prisma.review.count({ where: { storeId, status: "PUBLISHED" } }),
     prisma.product.findFirst({ where: { storeId, status: "ACTIVE" }, orderBy: { createdAt: "desc" }, select: { id: true } }),
+    prisma.product.findMany({
+      where: { storeId, status: "ACTIVE", images: { some: {} } },
+      select: { title: true, slug: true, images: { orderBy: { position: "asc" }, take: 1, select: { url: true, alt: true } } },
+      orderBy: { createdAt: "desc" }, take: 6,
+    }),
   ]);
   return {
     name: store.name, description: store.description, industry: store.industry, goal: "catalog",
-    catalog: { productCount, collectionSlugs: collections.map((c) => c.slug), featuredProductId: newest?.id ?? null, hasReviews: reviewCount > 0 },
+    catalog: {
+      productCount, collectionSlugs: collections.map((c) => c.slug), featuredProductId: newest?.id ?? null, hasReviews: reviewCount > 0,
+      looks: withImages.map((p) => ({ url: p.images[0].url, alt: p.images[0].alt ?? "", title: p.title, slug: p.slug })),
+    },
   };
 }
 

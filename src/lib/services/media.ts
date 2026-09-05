@@ -51,7 +51,7 @@ export function sniffImageType(buffer: Buffer): string | null {
 export type MediaStorage =
   | { provider: "supabase"; durable: true; label: string }
   | { provider: "vercel-blob"; durable: true; label: string }
-  | { provider: "local"; durable: false; label: string };
+  | { provider: "local"; durable: boolean; label: string };
 
 export function mediaStorage(): MediaStorage {
   if (process.env.SUPABASE_URL?.trim() && process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
@@ -59,6 +59,11 @@ export function mediaStorage(): MediaStorage {
   }
   if (process.env.BLOB_READ_WRITE_TOKEN?.trim()) {
     return { provider: "vercel-blob", durable: true, label: "Vercel Blob" };
+  }
+  // A self-hosted server with a persistent disk may opt in explicitly. Never
+  // the default: on serverless hosts the disk is discarded on every deploy.
+  if (process.env.MEDIA_STORAGE?.trim().toLowerCase() === "local") {
+    return { provider: "local", durable: true, label: "server disk (MEDIA_STORAGE=local)" };
   }
   return { provider: "local", durable: false, label: "local disk (development only)" };
 }

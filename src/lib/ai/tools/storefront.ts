@@ -1,10 +1,11 @@
+import { hasPremiumDesign, PREMIUM_LOCK_MESSAGE } from "@/lib/storefront/premium";
 import { z } from "zod";
 import { prisma, type Prisma } from "@/lib/db";
 import { defineTool } from "@/lib/ai/types";
 import { slugify } from "@/lib/utils";
-import { audit, uniqueStoreSlug } from "@/lib/services/context";
+import { audit, uniqueStoreSlug, ValidationError } from "@/lib/services/context";
 import {
-  SECTION_TYPES, defaultSectionConfig, isSectionType, normaliseSectionConfig, summariseSection,
+  SECTION_META, SECTION_TYPES, defaultSectionConfig, isPremiumSection, isSectionType, normaliseSectionConfig, summariseSection,
 } from "@/lib/storefront/sections";
 import {
   BUTTON_SHAPES, BUTTON_STYLES, CARD_STYLES, DENSITIES, DESIGN_DIRECTIONS, DIRECTION_PRESETS,
@@ -114,6 +115,9 @@ export const storefrontTools = [
     risk: "high",
     capability: "storefront:write",
     async confirm(input, ctx) {
+      if (isPremiumSection(input.type) && !(await hasPremiumDesign(ctx.organizationId, ctx.storeId))) {
+        throw new ValidationError(`The ${SECTION_META[input.type].label} section is a premium theme feature. ${PREMIUM_LOCK_MESSAGE}`);
+      }
       const page = await findPage(ctx.storeId, input.page);
       return {
         title: `Add a ${input.type} section to ${page.title}?`,
